@@ -5,6 +5,7 @@
 .nitro
 .cache
 dist
+package-lock.json
 
 # Node dependencies
 node_modules
@@ -38,12 +39,6 @@ logs
 *.sln
 *.sw?
 .yarn
-
-# iconify dist files
-plugins/iconify/icons.css
-
-# Ignore MSW script
-public/mockServiceWorker.js
 
 # Env files
 .env*

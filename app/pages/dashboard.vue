@@ -18,6 +18,25 @@ const recentActivity = computed(() => activityEvents.slice(0, 6))
 const healthyServices = computed(() => services.filter(s => s.status === 'operational').length)
 const totalServices = computed(() => services.length)
 
+// Generate incident activity data for last 7 days
+const incidentActivity = computed(() => {
+  const days = []
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date()
+    date.setDate(date.getDate() - i)
+    const dateStr = date.toISOString().split('T')[0]
+    const count = incidents.filter(inc => inc.createdAt.startsWith(dateStr)).length
+    days.push({
+      date: dateStr,
+      label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      count
+    })
+  }
+  return days
+})
+
+const maxIncidentCount = computed(() => Math.max(...incidentActivity.value.map(d => d.count), 1))
+
 onMounted(async () => {
   stats.value = await dashboardRepository.getStats()
   loading.value = false
@@ -63,6 +82,28 @@ function getGreeting(): string {
       <div class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-300 dark:bg-neutral-100">
         <p class="text-[12px] font-medium text-neutral-500">Current uptime</p>
         <p class="mt-1 text-2xl font-semibold text-success-500">{{ stats.uptime }}%</p>
+      </div>
+    </div>
+
+    <!-- Incident Activity Chart -->
+    <div class="mb-6 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-300 dark:bg-neutral-100">
+      <h2 class="mb-4 text-[14px] font-semibold text-neutral-900 dark:text-neutral-800">Incident activity (last 7 days)</h2>
+      <div class="flex h-32 items-end gap-2">
+        <div
+          v-for="day in incidentActivity"
+          :key="day.date"
+          class="flex flex-1 flex-col items-center gap-1"
+        >
+          <div class="relative w-full flex-1">
+            <div
+              class="absolute bottom-0 w-full rounded-t bg-primary-500 transition-all hover:bg-primary-600 dark:bg-primary-400 dark:hover:bg-primary-300"
+              :style="{ height: `${(day.count / maxIncidentCount) * 100}%`, minHeight: day.count > 0 ? '4px' : '0' }"
+              :title="`${day.count} incident${day.count !== 1 ? 's' : ''}`"
+            />
+          </div>
+          <span class="text-[11px] text-neutral-500">{{ day.label }}</span>
+          <span class="text-[11px] font-medium text-neutral-700 dark:text-neutral-600">{{ day.count }}</span>
+        </div>
       </div>
     </div>
 

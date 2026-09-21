@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { incidentRepository } from '~/services/repository'
-import type { Incident, TimelineEvent, Comment } from '~/types'
+import { incidents as allIncidents } from '~/services/mock-data'
+import type { Incident, IncidentStatus, TimelineEvent, Comment } from '~/types'
 import { formatDateTime, formatTime, formatRelativeTime } from '~/utils'
 
 definePageMeta({ layout: 'default' })
@@ -12,8 +13,9 @@ const incident = ref<Incident | null>(null)
 const timeline = ref<TimelineEvent[]>([])
 const incidentComments = ref<Comment[]>([])
 const loading = ref(true)
-const activeTab = ref<'timeline' | 'comments'>('timeline')
+const activeTab = ref<'timeline' | 'comments' | 'activity'>('timeline')
 const newComment = ref('')
+const transitioning = ref(false)
 
 onMounted(async () => {
   const [inc, tl, cmts] = await Promise.all([
@@ -36,6 +38,70 @@ const timelineIcon: Record<string, string> = {
   note: 'i-lucide-file-text',
   resolved: 'i-lucide-check-circle'
 }
+
+// State transitions
+const statusFlow: Record<IncidentStatus, IncidentStatus | null> = {
+  investigating: 'identified',
+  identified: 'monitoring',
+  monitoring: 'resolved',
+  resolved: null,
+  postmortem: null
+}
+
+const nextStatus = computed(() => {
+  if (!incident.value) return null
+  return statusFlow[incident.value.status]
+})
+
+const previousStatus = computed(() => {
+  if (!incident.value) return null
+  const entries = Object.entries(statusFlow) as [IncidentStatus, IncidentStatus | null][]
+  const found = entries.find(([, next]) => next === incident.value!.status)
+  return found ? found[0] : null
+})
+
+async function transitionTo(status: IncidentStatus) {
+  if (!incident.value || transitioning.value) return
+  transitioning.value = true
+
+  // Add timeline event
+  const newEvent: TimelineEvent = {
+    id: `tl-new-${Date.now()}`,
+    incidentId: incident.value.id,
+    type: 'status_change',
+    title: `Status changed to ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+    userId: 'user-1',
+    user: { id: 'user-1', name: 'Mark Chen', email: 'mark@northstarlabs.io', role: 'admin', organizationId: 'org-1' },
+    createdAt: new Date().toISOString()
+  }
+
+  // Update incident
+  incident.value.status = status
+  incident.value.updatedAt = new Date().toISOString()
+  if (status === 'resolved') {
+    incident.value.resolvedAt = new Date().toISOString()
+  }
+
+  // Add to timeline
+  timeline.value.push(newEvent)
+
+  await new Promise(r => setTimeout(r, 300))
+  transitioning.value = false
+}
+
+// Related incidents - same service or team
+const relatedIncidents = computed(() => {
+  if (!incident.value) return []
+  return allIncidents
+    .filter(i =>
+      i.id !== incident.value!.id &&
+      (
+        i.serviceIds.some(sid => incident.value!.serviceIds.includes(sid)) ||
+        i.teamId === incident.value!.teamId
+      )
+    )
+    .slice(0, 5)
+})
 </script>
 
 <template>
@@ -66,10 +132,38 @@ const timelineIcon: Record<string, string> = {
             </h1>
             <p class="mt-1 text-[13px] text-neutral-500">{{ incident.description }}</p>
           </div>
-          <div class="flex shrink-0 items-center gap-2">
+          <div class="flex shrink-0 flex-wrap items-center gap-2">
             <SharedSeverityBadge :severity="incident.severity" />
             <IncidentsIncidentStatusBadge :status="incident.status" />
           </div>
+        </div>
+
+        <!-- State transition buttons -->
+        <div v-if="nextStatus || previousStatus" class="mt-4 flex flex-wrap items-center gap-2">
+          <span class="text-[12px] text-neutral-500">Move to:</span>
+          <button
+            v-if="previousStatus"
+            class="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-[12px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-300 dark:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-200"
+            :disabled="transitioning"
+            @click="transitionTo(previousStatus!)"
+          >
+            <UIcon name="i-lucide-arrow-left" class="mr-1 inline h-3 w-3" />
+            {{ previousStatus.charAt(0).toUpperCase() + previousStatus.slice(1) }}
+          </button>
+          <button
+            v-if="nextStatus"
+            :class="[
+              'rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-50',
+              nextStatus === 'resolved'
+                ? 'bg-success-500 text-white hover:bg-success-600'
+                : 'bg-primary-500 text-white hover:bg-primary-600'
+            ]"
+            :disabled="transitioning"
+            @click="transitionTo(nextStatus!)"
+          >
+            {{ nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1) }}
+            <UIcon name="i-lucide-arrow-right" class="ml-1 inline h-3 w-3" />
+          </button>
         </div>
       </div>
 
@@ -99,6 +193,17 @@ const timelineIcon: Record<string, string> = {
               @click="activeTab = 'comments'"
             >
               Comments ({{ incidentComments.length }})
+            </button>
+            <button
+              :class="[
+                'border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
+                activeTab === 'activity'
+                  ? 'border-primary-500 text-primary-600 dark:border-primary-400 dark:text-primary-400'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-600'
+              ]"
+              @click="activeTab = 'activity'"
+            >
+              Activity
             </button>
           </div>
 
@@ -159,6 +264,32 @@ const timelineIcon: Record<string, string> = {
               />
               <div class="mt-2 flex justify-end">
                 <UButton color="primary" size="sm" label="Comment" :disabled="!newComment.trim()" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity tab -->
+          <div v-if="activeTab === 'activity'" class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-300 dark:bg-neutral-100">
+            <p class="text-[13px] text-neutral-500">Detailed activity log for this incident will appear here.</p>
+          </div>
+
+          <!-- Related incidents -->
+          <div v-if="relatedIncidents.length > 0" class="mt-6">
+            <h3 class="mb-3 text-[14px] font-semibold text-neutral-900 dark:text-neutral-800">Related incidents</h3>
+            <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+              <div class="divide-y divide-neutral-200 dark:divide-neutral-300">
+                <NuxtLink
+                  v-for="related in relatedIncidents"
+                  :key="related.id"
+                  :to="`/incidents/${related.id}`"
+                  class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
+                >
+                  <SharedSeverityBadge :severity="related.severity" />
+                  <span class="flex-1 truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-800">
+                    INC-{{ related.number }} {{ related.title }}
+                  </span>
+                  <IncidentsIncidentStatusBadge :status="related.status" />
+                </NuxtLink>
               </div>
             </div>
           </div>

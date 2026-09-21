@@ -19,9 +19,47 @@ const form = reactive({
 const errors = reactive<Record<string, string>>({})
 const submitting = ref(false)
 const submitted = ref(false)
+const submitError = ref('')
 const dirty = ref(false)
+const showUnsavedDialog = ref(false)
+const pendingNavigation = ref<string | null>(null)
 
 watch(form, () => { dirty.value = true }, { deep: true })
+
+// Unsaved changes warning
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (dirty.value && !submitted.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+})
+
+// Intercept navigation
+function handleCancel() {
+  if (dirty.value) {
+    showUnsavedDialog.value = true
+  } else {
+    router.push('/incidents')
+  }
+}
+
+function confirmLeave() {
+  dirty.value = false
+  showUnsavedDialog.value = false
+  router.push('/incidents')
+}
+
+function stayOnPage() {
+  showUnsavedDialog.value = false
+}
 
 function validate(): boolean {
   const e: Record<string, string> = {}
@@ -37,13 +75,24 @@ function validate(): boolean {
 async function handleSubmit() {
   if (!validate()) return
   submitting.value = true
-  await new Promise(r => setTimeout(r, 800))
-  submitting.value = false
-  submitted.value = true
-  dirty.value = false
-  setTimeout(() => {
-    router.push('/incidents')
-  }, 1500)
+  submitError.value = ''
+
+  try {
+    await new Promise(r => setTimeout(r, 800))
+    // Simulate occasional error for demo
+    if (Math.random() < 0.1) {
+      throw new Error('Network error. Please try again.')
+    }
+    submitted.value = true
+    dirty.value = false
+    setTimeout(() => {
+      router.push('/incidents')
+    }, 1500)
+  } catch (err) {
+    submitError.value = err instanceof Error ? err.message : 'Failed to create incident. Please try again.'
+  } finally {
+    submitting.value = false
+  }
 }
 
 const severityOptions = [
@@ -67,6 +116,23 @@ const severityOptions = [
 
     <!-- Form -->
     <form v-else class="space-y-5" @submit.prevent="handleSubmit">
+      <!-- Error state -->
+      <div v-if="submitError" class="rounded-lg border border-danger-500/20 bg-danger-50 p-4 dark:bg-danger-50/10">
+        <div class="flex items-start gap-3">
+          <UIcon name="i-lucide-alert-circle" class="mt-0.5 h-5 w-5 shrink-0 text-danger-500" />
+          <div>
+            <h3 class="text-[13px] font-medium text-danger-500">Failed to create incident</h3>
+            <p class="mt-0.5 text-[12px] text-danger-500/80">{{ submitError }}</p>
+          </div>
+          <button
+            class="ml-auto text-danger-500 hover:text-danger-600"
+            @click="submitError = ''"
+          >
+            <UIcon name="i-lucide-x" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
       <div class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-300 dark:bg-neutral-100">
         <div class="space-y-5">
           <!-- Title -->
@@ -193,13 +259,13 @@ const severityOptions = [
 
       <!-- Actions -->
       <div class="flex items-center justify-end gap-3">
-        <UButton
-          to="/incidents"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          label="Cancel"
-        />
+        <button
+          type="button"
+          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-500 dark:hover:bg-neutral-200"
+          @click="handleCancel"
+        >
+          Cancel
+        </button>
         <UButton
           type="submit"
           color="primary"
@@ -209,5 +275,30 @@ const severityOptions = [
         />
       </div>
     </form>
+
+    <!-- Unsaved changes dialog -->
+    <UModal v-model:open="showUnsavedDialog" :ui="{ content: 'rounded-xl' }">
+      <div class="p-6">
+        <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-50 dark:bg-warning-50/20">
+          <UIcon name="i-lucide-alert-triangle" class="h-5 w-5 text-warning-500" />
+        </div>
+        <h3 class="mb-1 text-[14px] font-semibold text-neutral-900 dark:text-neutral-800">Unsaved changes</h3>
+        <p class="text-[13px] text-neutral-500">You have unsaved changes. Are you sure you want to leave? Your changes will be lost.</p>
+        <div class="mt-6 flex justify-end gap-2">
+          <button
+            class="rounded-md border border-neutral-200 px-3 py-1.5 text-[13px] font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-300 dark:text-neutral-600 dark:hover:bg-neutral-200"
+            @click="stayOnPage"
+          >
+            Keep editing
+          </button>
+          <button
+            class="rounded-md bg-danger-500 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-danger-600"
+            @click="confirmLeave"
+          >
+            Discard changes
+          </button>
+        </div>
+      </div>
+    </UModal>
   </div>
 </template>
