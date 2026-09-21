@@ -1,0 +1,126 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* OpsFlow primary - teal/green */
+  --color-primary-50: #E4F2EE;
+  --color-primary-100: #CCE8E0;
+  --color-primary-200: #99D1C1;
+  --color-primary-300: #66BAA2;
+  --color-primary-400: #3DBB98;
+  --color-primary-500: #147D64;
+  --color-primary-600: #0F6652;
+  --color-primary-700: #0B4F3F;
+  --color-primary-800: #07382C;
+  --color-primary-900: #042119;
+  --color-primary-950: #020F0B;
+
+  /* Neutral palette - warm gray */
+  --color-neutral-50: #F7F7F5;
+  --color-neutral-100: #F0F1EF;
+  --color-neutral-200: #E3E6E3;
+  --color-neutral-300: #D2D7D3;
+  --color-neutral-400: #8A938E;
+  --color-neutral-500: #66706B;
+  --color-neutral-600: #4A534E;
+  --color-neutral-700: #343B37;
+  --color-neutral-800: #232825;
+  --color-neutral-900: #171918;
+  --color-neutral-950: #101312;
+
+  /* Semantic colors */
+  --color-success-50: #E5F4EC;
+  --color-success-500: #27845A;
+  --color-success-600: #1F6B48;
+  --color-success-700: #55C98A;
+
+  --color-warning-50: #FAF1DD;
+  --color-warning-500: #B7791F;
+  --color-warning-600: #946118;
+  --color-warning-700: #D5A34A;
+
+  --color-danger-50: #FBE9E7;
+  --color-danger-500: #C2413B;
+  --color-danger-600: #9E3530;
+  --color-danger-700: #E06A63;
+
+  --color-info-50: #E9F0F8;
+  --color-info-500: #3B6EA8;
+  --color-info-600: #2F5886;
+  --color-info-700: #6EA0D6;
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+}
+
+/* Dark mode surface colors */
+.dark {
+  --color-neutral-50: #101312;
+  --color-neutral-100: #171B19;
+  --color-neutral-200: #1D2320;
+  --color-neutral-300: #29302C;
+  --color-neutral-400: #39423D;
+  --color-neutral-500: #6F7973;
+  --color-neutral-600: #9AA59F;
+  --color-neutral-700: #C5CCC8;
+  --color-neutral-800: #E0E5E1;
+  --color-neutral-900: #F1F4F2;
+  --color-neutral-950: #FFFFFF;
+
+  --color-primary-50: #153A31;
+  --color-primary-100: #1A4A3E;
+  --color-primary-200: #256B5A;
+  --color-primary-300: #309877;
+  --color-primary-400: #3DBB98;
+  --color-primary-500: #58CBA9;
+  --color-primary-600: #78D8BC;
+  --color-primary-700: #A0E5D1;
+  --color-primary-800: #C8F2E6;
+  --color-primary-900: #E4F9F2;
+  --color-primary-950: #F0FCF8;
+}
+
+/* Base styles */
+html {
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  @apply bg-neutral-50 text-neutral-900 dark:bg-neutral-50 dark:text-neutral-900;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-300 dark:bg-neutral-400 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-neutral-400 dark:bg-neutral-500;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
