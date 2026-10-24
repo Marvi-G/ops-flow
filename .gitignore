@@ -46,3 +46,8 @@ logs
 
 # Local Netlify folder
 .netlify
+
+# Claude
+.claude
+CLAUDE.md
+.claudeignore
