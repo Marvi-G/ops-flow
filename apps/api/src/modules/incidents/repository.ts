@@ -2,6 +2,25 @@ import { Prisma } from '@prisma/client';
 import { getDatabase } from '../../infrastructure/database/index.js';
 import type { CreateIncidentInput, UpdateIncidentInput, IncidentQueryInput } from './schemas.js';
 
+const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'];
+
+function severityRank(severity: string): number {
+  const rank = SEVERITY_ORDER.indexOf(severity);
+  return rank === -1 ? SEVERITY_ORDER.length : rank;
+}
+
+// Relations returned with each row of the incident list
+const listInclude = {
+  team: { select: { id: true, name: true } },
+  assignee: { select: { id: true, name: true, email: true } },
+  createdBy: { select: { id: true, name: true, email: true } },
+  services: {
+    include: {
+      service: { select: { id: true, name: true } },
+    },
+  },
+} satisfies Prisma.IncidentInclude;
+
 export class IncidentRepository {
   async findAll(organizationId: string, query: IncidentQueryInput) {
     const db = getDatabase();
@@ -10,12 +29,17 @@ export class IncidentRepository {
       organizationId,
     };
 
-    // Search filter
+    // Search filter: title/description, plus "INC-12" or "inc12" matches by number
     if (query.search) {
-      where.OR = [
+      const search: Prisma.IncidentWhereInput[] = [
         { title: { contains: query.search, mode: 'insensitive' } },
         { description: { contains: query.search, mode: 'insensitive' } },
       ];
+      const incNumber = /^inc-?(\d{1,9})$/i.exec(query.search.trim());
+      if (incNumber) {
+        search.push({ number: Number(incNumber[1]) });
+      }
+      where.OR = search;
     }
 
     // Severity filter
@@ -28,15 +52,15 @@ export class IncidentRepository {
       where.status = { in: query.status.split(',') };
     }
 
-    // Team filter
+    // Team filter (one id or a comma-separated list)
     if (query.teamId) {
-      where.teamId = query.teamId;
+      where.teamId = { in: query.teamId.split(',') };
     }
 
-    // Service filter
+    // Service filter (one id or a comma-separated list)
     if (query.serviceId) {
       where.services = {
-        some: { serviceId: query.serviceId },
+        some: { serviceId: { in: query.serviceId.split(',') } },
       };
     }
 
@@ -56,56 +80,51 @@ export class IncidentRepository {
       }
     }
 
-    // Sorting
-    const orderBy: Prisma.IncidentOrderByWithRelationInput = {};
-    if (query.sortBy === 'severity') {
-      // Custom severity ordering
-      orderBy.severity = query.sortOrder;
-    } else {
-      orderBy[query.sortBy] = query.sortOrder;
-    }
+    const skip = (query.page - 1) * query.pageSize;
 
-    const [incidents, total] = await Promise.all([
-      db.incident.findMany({
+    let incidents;
+    let total: number;
+
+    if (query.sortBy === 'severity') {
+      // Severity is stored as text, so the database would sort it alphabetically
+      // (critical, high, low, medium). Rank it ourselves: sort the ids of the matching
+      // incidents, take the requested page, then load only those rows.
+      // 'desc' means most severe first; ties go to the newest incident.
+      const rows = await db.incident.findMany({
         where,
-        orderBy,
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
-        include: {
-          team: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          assignee: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          services: {
-            include: {
-              service: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      }),
-      db.incident.count({ where }),
-    ]);
+        select: { id: true, severity: true, createdAt: true },
+      });
+      const direction = query.sortOrder === 'desc' ? 1 : -1;
+      rows.sort(
+        (a, b) =>
+          direction * (severityRank(a.severity) - severityRank(b.severity)) ||
+          b.createdAt.getTime() - a.createdAt.getTime()
+      );
+      total = rows.length;
+
+      const pageIds = rows.slice(skip, skip + query.pageSize).map((row) => row.id);
+      const loaded = await db.incident.findMany({
+        where: { id: { in: pageIds }, organizationId },
+        include: listInclude,
+      });
+      incidents = pageIds
+        .map((id) => loaded.find((incident) => incident.id === id))
+        .filter((incident): incident is (typeof loaded)[number] => incident !== undefined);
+    } else {
+      const orderBy: Prisma.IncidentOrderByWithRelationInput = {};
+      orderBy[query.sortBy] = query.sortOrder;
+
+      [incidents, total] = await Promise.all([
+        db.incident.findMany({
+          where,
+          orderBy,
+          skip,
+          take: query.pageSize,
+          include: listInclude,
+        }),
+        db.incident.count({ where }),
+      ]);
+    }
 
     return {
       data: incidents.map((incident) => ({

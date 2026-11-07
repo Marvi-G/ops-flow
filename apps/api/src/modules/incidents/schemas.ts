@@ -23,14 +23,22 @@ export const updateIncidentSchema = z.object({
   serviceIds: z.array(z.string().uuid()).optional(),
 });
 
+// One UUID or a comma-separated list of them (e.g. "id1,id2")
+const uuidList = z
+  .string()
+  .refine(
+    (value) => value.split(',').every((id) => z.string().uuid().safeParse(id).success),
+    'Must be a UUID or a comma-separated list of UUIDs'
+  );
+
 export const incidentQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().optional(),
   severity: z.string().optional(),
   status: z.string().optional(),
-  teamId: z.string().uuid().optional(),
-  serviceId: z.string().uuid().optional(),
+  teamId: uuidList.optional(),
+  serviceId: uuidList.optional(),
   assigneeId: z.string().uuid().optional(),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),

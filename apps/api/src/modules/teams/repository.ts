@@ -1,6 +1,9 @@
 import { getDatabase } from '../../infrastructure/database/index.js';
 import type { CreateTeamInput, UpdateTeamInput } from './schemas.js';
 
+// `_count.incidents` below counts only active incidents (not resolved / post-mortem)
+const ACTIVE_INCIDENTS = { where: { status: { notIn: ['resolved', 'postmortem'] } } };
+
 export class TeamRepository {
   async findAll(organizationId: string) {
     const db = getDatabase();
@@ -11,7 +14,7 @@ export class TeamRepository {
           select: {
             members: true,
             projects: true,
-            incidents: true,
+            incidents: ACTIVE_INCIDENTS,
           },
         },
         members: {
@@ -41,7 +44,7 @@ export class TeamRepository {
           select: {
             members: true,
             projects: true,
-            incidents: true,
+            incidents: ACTIVE_INCIDENTS,
           },
         },
         members: {

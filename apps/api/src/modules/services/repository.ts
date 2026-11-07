@@ -1,6 +1,11 @@
 import { getDatabase } from '../../infrastructure/database/index.js';
 import type { CreateServiceInput, UpdateServiceInput } from './schemas.js';
 
+// `_count.incidents` below counts only open incidents (not resolved / post-mortem)
+const OPEN_INCIDENTS = {
+  where: { incident: { status: { notIn: ['resolved', 'postmortem'] } } },
+};
+
 export class ServiceRepository {
   async findAll(organizationId: string) {
     const db = getDatabase();
@@ -15,7 +20,7 @@ export class ServiceRepository {
         },
         _count: {
           select: {
-            incidents: true,
+            incidents: OPEN_INCIDENTS,
           },
         },
       },
@@ -52,7 +57,7 @@ export class ServiceRepository {
         },
         _count: {
           select: {
-            incidents: true,
+            incidents: OPEN_INCIDENTS,
           },
         },
       },

@@ -58,6 +58,78 @@ describe('Incidents', () => {
       expect(res.body.meta.pageSize).toBe(2);
     });
 
+    it('should sort by severity, most severe first when descending', async () => {
+      const res = await request(app)
+        .get('/api/incidents?sortBy=severity&sortOrder=desc&pageSize=100')
+        .set('Cookie', sessionCookie);
+
+      const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+      const ranks = res.body.data.map((i: any) => rank[i.severity]);
+
+      expect(res.status).toBe(200);
+      expect(ranks).toEqual([...ranks].sort((a: number, b: number) => a - b));
+    });
+
+    it('should sort by severity, least severe first when ascending', async () => {
+      const res = await request(app)
+        .get('/api/incidents?sortBy=severity&sortOrder=asc&pageSize=100')
+        .set('Cookie', sessionCookie);
+
+      const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+      const ranks = res.body.data.map((i: any) => rank[i.severity]);
+
+      expect(res.status).toBe(200);
+      expect(ranks).toEqual([...ranks].sort((a: number, b: number) => b - a));
+    });
+
+    it('should keep pagination consistent when sorting by severity', async () => {
+      const all = await request(app)
+        .get('/api/incidents?sortBy=severity&sortOrder=desc&pageSize=100')
+        .set('Cookie', sessionCookie);
+      const page1 = await request(app)
+        .get('/api/incidents?sortBy=severity&sortOrder=desc&page=1&pageSize=2')
+        .set('Cookie', sessionCookie);
+      const page2 = await request(app)
+        .get('/api/incidents?sortBy=severity&sortOrder=desc&page=2&pageSize=2')
+        .set('Cookie', sessionCookie);
+
+      const ids = (res: any) => res.body.data.map((i: any) => i.id);
+      expect([...ids(page1), ...ids(page2)]).toEqual(ids(all).slice(0, 4));
+      expect(page1.body.meta.total).toBe(all.body.meta.total);
+    });
+
+    it('should find an incident by its INC-<number>', async () => {
+      const list = await request(app).get('/api/incidents').set('Cookie', sessionCookie);
+      const target = list.body.data[0];
+
+      const res = await request(app)
+        .get(`/api/incidents?search=INC-${target.number}`)
+        .set('Cookie', sessionCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.some((i: any) => i.id === target.id)).toBe(true);
+    });
+
+    it('should filter by several teams at once', async () => {
+      const teams = await request(app).get('/api/teams').set('Cookie', sessionCookie);
+      const teamIds: string[] = teams.body.data.slice(0, 2).map((t: any) => t.id);
+
+      const res = await request(app)
+        .get(`/api/incidents?teamId=${teamIds.join(',')}&pageSize=100`)
+        .set('Cookie', sessionCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.every((i: any) => teamIds.includes(i.teamId))).toBe(true);
+    });
+
+    it('should reject a malformed team id list', async () => {
+      const res = await request(app)
+        .get('/api/incidents?teamId=not-a-uuid')
+        .set('Cookie', sessionCookie);
+
+      expect(res.status).toBe(422);
+    });
+
     it('should reject unauthenticated requests', async () => {
       const res = await request(app).get('/api/incidents');
 
