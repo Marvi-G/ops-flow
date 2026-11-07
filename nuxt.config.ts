@@ -22,6 +22,21 @@ export default defineNuxtConfig({
     '/': { redirect: '/dashboard' }
   },
 
+  runtimeConfig: {
+    public: {
+      apiBase: ''
+    }
+  },
+
+  nitro: {
+    devProxy: {
+      '/api': {
+        target: 'http://localhost:4000/api',
+        changeOrigin: true
+      }
+    }
+  },
+
   compatibilityDate: '2026-06-30',
 
   vite: {
