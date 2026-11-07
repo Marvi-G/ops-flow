@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "express": "^4.21.1",
@@ -27,12 +27,13 @@
     "helmet": "^8.0.0",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",
+    "serverless-http": "^3.2.0",
     "uuid": "^11.0.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

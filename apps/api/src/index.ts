@@ -103,7 +103,8 @@ app.use(errorHandler);
 // Initialize database
 createDatabase();
 
-if (!process.env.VITEST) {
+// Don't start a server under tests or on Netlify (the app runs as a function there)
+if (!process.env.VITEST && !process.env.NETLIFY) {
   const server = app.listen(config.PORT, () => {
     logger.info(`🚀 Server running on port ${config.PORT}`);
     logger.info(`📝 Environment: ${config.NODE_ENV}`);

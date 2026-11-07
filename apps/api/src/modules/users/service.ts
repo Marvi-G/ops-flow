@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { userRepository } from './repository.js';
 import { getDatabase } from '../../infrastructure/database/index.js';
 import { NotFoundError, UnauthorizedError } from '../../infrastructure/errors.js';

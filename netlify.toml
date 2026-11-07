@@ -1,0 +1,26 @@
+# Netlify config: Nuxt frontend (repo root) + Express API as a function (apps/api)
+
+[build]
+  # The API has its own package.json. Install it (including devDependencies, which
+  # hold the prisma CLI) and generate the Prisma client, then build Nuxt.
+  command = "npm --prefix apps/api ci --include=dev && npm --prefix apps/api run db:generate && npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "apps/api/functions"
+  node_bundler = "esbuild"
+  # Keep Prisma out of the bundle and ship its generated client + query engine instead.
+  external_node_modules = ["@prisma/client", ".prisma/client"]
+  included_files = [
+    "apps/api/node_modules/.prisma/**",
+    "apps/api/node_modules/@prisma/client/**"
+  ]
+
+# Send every /api request to the Express function (same origin: no CORS, cookies just work).
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true

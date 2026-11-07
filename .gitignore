@@ -5,7 +5,6 @@
 .nitro
 .cache
 dist
-package-lock.json
 
 # Node dependencies
 node_modules
@@ -46,6 +45,9 @@ logs
 
 # Local Netlify folder
 .netlify
+
+# Local curl cookie jar (holds a session token)
+cookies.txt
 
 # Claude
 .claude
