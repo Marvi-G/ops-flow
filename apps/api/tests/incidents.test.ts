@@ -10,8 +10,8 @@ describe('Incidents', () => {
     const res = await request(app)
       .post('/api/auth/login')
       .send({
-        email: 'mark@northstarlabs.io',
-        password: 'password123',
+        email: 'admin@northstarlabs.io',
+        password: 'admin',
       });
     sessionCookie = res.headers['set-cookie'][0];
   });
@@ -215,8 +215,8 @@ describe('Tenant Isolation', () => {
     const res1 = await request(app)
       .post('/api/auth/login')
       .send({
-        email: 'mark@northstarlabs.io',
-        password: 'password123',
+        email: 'admin@northstarlabs.io',
+        password: 'admin',
       });
     user1Cookie = res1.headers['set-cookie'][0];
 

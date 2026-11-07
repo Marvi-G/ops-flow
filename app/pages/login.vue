@@ -5,8 +5,8 @@ import { useSessionStore } from '~/stores/session'
 definePageMeta({ layout: false })
 
 // Seeded demo account (see apps/api/README.md)
-const email = ref('mark@northstarlabs.io')
-const password = ref('password123')
+const email = ref('admin@northstarlabs.io')
+const password = ref('admin')
 const loading = ref(false)
 const error = ref('')
 
@@ -93,7 +93,7 @@ async function handleLogin() {
       </form>
 
       <p class="mt-4 text-center text-[12px] text-neutral-400">
-        Demo account: mark@northstarlabs.io / password123
+        Demo account: admin@northstarlabs.io / admin
       </p>
     </div>
   </div>

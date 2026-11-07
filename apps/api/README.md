@@ -332,8 +332,10 @@ The seed script creates:
 - **Incidents**: 4 incidents with comments and events
 
 Default credentials:
-- Email: `mark@northstarlabs.io`
-- Password: `password123`
+- Email: `admin@northstarlabs.io` (Mark Chen)
+- Password: `admin`
+
+The other seeded users (`sarah@`, `alex@`, ... `@northstarlabs.io`) use `password123`.
 
 ## Future Enhancements
 

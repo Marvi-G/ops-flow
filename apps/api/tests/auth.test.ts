@@ -10,13 +10,13 @@ describe('Authentication', () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'mark@northstarlabs.io',
-          password: 'password123',
+          email: 'admin@northstarlabs.io',
+          password: 'admin',
         });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.user.email).toBe('mark@northstarlabs.io');
+      expect(res.body.data.user.email).toBe('admin@northstarlabs.io');
       expect(res.body.data.user.name).toBe('Mark Chen');
       expect(res.body.data.organization.name).toBe('Northstar Labs');
       expect(res.headers['set-cookie']).toBeDefined();
@@ -38,7 +38,7 @@ describe('Authentication', () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'mark@northstarlabs.io',
+          email: 'admin@northstarlabs.io',
           password: 'wrongpassword',
         });
 
@@ -65,8 +65,8 @@ describe('Authentication', () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'mark@northstarlabs.io',
-          password: 'password123',
+          email: 'admin@northstarlabs.io',
+          password: 'admin',
         });
       sessionCookie = res.headers['set-cookie'][0];
     });
@@ -78,7 +78,7 @@ describe('Authentication', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.user.email).toBe('mark@northstarlabs.io');
+      expect(res.body.data.user.email).toBe('admin@northstarlabs.io');
       expect(res.body.data.organizations).toBeInstanceOf(Array);
       expect(res.body.data.organizations.length).toBeGreaterThan(0);
     });
@@ -97,8 +97,8 @@ describe('Authentication', () => {
       const loginRes = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'mark@northstarlabs.io',
-          password: 'password123',
+          email: 'admin@northstarlabs.io',
+          password: 'admin',
         });
 
       const cookie = loginRes.headers['set-cookie'][0];

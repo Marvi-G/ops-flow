@@ -41,12 +41,14 @@ async function main() {
 
   // Create users
   const passwordHash = await bcrypt.hash('password123', SALT_ROUNDS);
+  // Demo account shown on the login page: admin@northstarlabs.io / admin
+  const adminPasswordHash = await bcrypt.hash('admin', SALT_ROUNDS);
 
   const users = await Promise.all([
     prisma.user.create({
       data: {
-        email: 'mark@northstarlabs.io',
-        passwordHash,
+        email: 'admin@northstarlabs.io',
+        passwordHash: adminPasswordHash,
         name: 'Mark Chen',
       },
     }),
@@ -548,8 +550,8 @@ async function main() {
 
   console.log('\n🎉 Seed completed successfully!');
   console.log('\n📋 Test credentials:');
-  console.log('   Email: mark@northstarlabs.io');
-  console.log('   Password: password123');
+  console.log('   Email: admin@northstarlabs.io');
+  console.log('   Password: admin');
 }
 
 main()
