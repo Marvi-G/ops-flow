@@ -28,6 +28,6 @@ const appStore = useAppStore()
     </div>
 
     <!-- Command Palette -->
-    <CommandPalette />
+    <AppCommandPalette />
   </div>
 </template>

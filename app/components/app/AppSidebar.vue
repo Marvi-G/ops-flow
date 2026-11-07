@@ -38,7 +38,7 @@ function isActive(path: string): boolean {
   >
     <!-- Logo / Org switcher -->
     <div class="flex h-14 items-center border-b border-neutral-200 px-3 dark:border-neutral-300">
-      <OrganizationSwitcher />
+      <AppOrganizationSwitcher />
     </div>
 
     <!-- Navigation -->
