@@ -55,6 +55,14 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  async function expireSession() {
+    reset()
+    const route = useRoute()
+    if (route.path !== '/login') {
+      await navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+    }
+  }
+
   async function login(email: string, password: string) {
     await api.post('/auth/login', { email, password })
     await fetchMe()
@@ -87,6 +95,7 @@ export const useSessionStore = defineStore('session', () => {
     initialized,
     unreadCount,
     fetchMe,
+    expireSession,
     login,
     logout,
     switchOrganization,

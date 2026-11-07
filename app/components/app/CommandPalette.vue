@@ -201,7 +201,14 @@ watch(search, () => {
 </script>
 
 <template>
-  <UModal v-model:open="appStore.commandPaletteOpen" :ui="{ content: 'rounded-xl overflow-hidden' }">
+  <UModal
+    v-model:open="appStore.commandPaletteOpen"
+    title="Command palette"
+    description="Search for pages, actions, incidents, projects and services"
+    :ui="{ content: 'rounded-xl overflow-hidden' }"
+  >
+    <!-- The default slot is the modal's trigger; the body goes in #content -->
+    <template #content>
     <div class="flex flex-col" @keydown="onKeydown">
       <!-- Search input -->
       <div class="flex items-center gap-3 border-b border-neutral-200 px-4 dark:border-neutral-300">
@@ -270,5 +277,6 @@ watch(search, () => {
         </div>
       </div>
     </div>
+    </template>
   </UModal>
 </template>

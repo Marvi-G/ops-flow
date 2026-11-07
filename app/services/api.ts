@@ -57,6 +57,11 @@ async function request<T>(method: HttpMethod, path: string, options: RequestOpti
     const res = (err as { response?: { status: number, _data?: ErrorEnvelope } }).response
     const apiError = res?._data?.error
     if (apiError) {
+      if (res!.status === 401 && import.meta.client && !path.startsWith('/auth/')) {
+        // Imported lazily: the session store imports this module
+        const { useSessionStore } = await import('~/stores/session')
+        await useSessionStore().expireSession()
+      }
       throw new ApiError(res!.status, apiError.code, apiError.message, apiError.details)
     }
     throw new ApiError(res?.status ?? 0, 'NETWORK_ERROR', 'Unable to reach the server')
