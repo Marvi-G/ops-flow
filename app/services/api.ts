@@ -47,7 +47,7 @@ async function request<T>(method: HttpMethod, path: string, options: RequestOpti
     const res = await untypedFetch(`/api${path}`, {
       ...options,
       method,
-      baseURL: config.public.apiBase,
+      baseURL: import.meta.server ? config.apiInternalBase : config.public.apiBase,
       credentials: 'include',
       headers: { ...headers, ...options.headers }
     }) as SuccessEnvelope<T> | undefined

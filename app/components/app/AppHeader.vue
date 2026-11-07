@@ -37,10 +37,10 @@ const appStore = useAppStore()
       <UColorModeButton />
 
       <!-- Notifications -->
-      <NotificationButton />
+      <AppNotificationButton />
 
       <!-- User menu -->
-      <UserMenu />
+      <AppUserMenu />
     </div>
   </header>
 </template>

@@ -4,9 +4,9 @@ import { useSessionStore } from '~/stores/session'
 const sessionStore = useSessionStore()
 const isOpen = ref(false)
 
-function selectOrg(orgId: string) {
-  sessionStore.switchOrganization(orgId)
+async function selectOrg(orgId: string) {
   isOpen.value = false
+  await sessionStore.switchOrganization(orgId)
 }
 </script>
 

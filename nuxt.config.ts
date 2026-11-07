@@ -24,6 +24,9 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Used for server-side rendering, which calls the API directly (no proxy).
+    // Override with NUXT_API_INTERNAL_BASE.
+    apiInternalBase: 'http://localhost:4000',
     public: {
       apiBase: ''
     }

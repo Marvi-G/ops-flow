@@ -1,4 +1,4 @@
-import type { Incident, IncidentFilters, IncidentSeverity, IncidentStatus, PaginationState } from '~/types'
+import type { Incident, IncidentFilters, IncidentSeverity, IncidentStatus, Organization, PaginationState, User } from '~/types'
 
 /**
  * Shapes returned by apps/api. Only the fields the frontend consumes are listed.
@@ -9,6 +9,45 @@ interface ApiUserRef {
   id: string
   name: string
   email: string
+}
+
+type OrgRole = User['role']
+
+/** Response of GET /api/auth/me */
+export interface ApiMe {
+  user: { id: string, email: string, name: string, avatar: string | null }
+  organization: { id: string, name: string, slug: string, plan: string, role: OrgRole }
+  organizations: { id: string, name: string, slug: string, role: OrgRole }[]
+}
+
+/**
+ * Maps /auth/me onto the frontend session types. The API does not return
+ * memberCount/createdAt yet (Phase 6), and only the current organization's plan.
+ */
+export function mapSession(me: ApiMe): { user: User, organization: Organization, allOrganizations: Organization[] } {
+  const toOrganization = (o: { id: string, name: string, slug: string }, plan: string): Organization => ({
+    id: o.id,
+    name: o.name,
+    slug: o.slug,
+    plan: plan as Organization['plan'],
+    memberCount: 0,
+    createdAt: ''
+  })
+
+  return {
+    user: {
+      id: me.user.id,
+      name: me.user.name,
+      email: me.user.email,
+      avatar: me.user.avatar ?? undefined,
+      role: me.organization.role,
+      organizationId: me.organization.id
+    },
+    organization: toOrganization(me.organization, me.organization.plan),
+    allOrganizations: me.organizations.map(o =>
+      toOrganization(o, o.id === me.organization.id ? me.organization.plan : 'free')
+    )
+  }
 }
 
 export interface ApiIncident {

@@ -21,7 +21,7 @@ const items = [
     {
       label: 'Sign out',
       icon: 'i-lucide-log-out',
-      onSelect: () => router.push('/login')
+      onSelect: () => sessionStore.logout()
     }
   ]
 ]

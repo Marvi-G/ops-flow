@@ -1,12 +1,25 @@
 <script setup lang="ts">
+import { ApiError } from '~/services/api'
+import { useSessionStore } from '~/stores/session'
+
 definePageMeta({ layout: false })
 
+// Seeded demo account (see apps/api/README.md)
 const email = ref('mark@northstarlabs.io')
-const password = ref('password')
+const password = ref('password123')
 const loading = ref(false)
 const error = ref('')
 
-const router = useRouter()
+const route = useRoute()
+const sessionStore = useSessionStore()
+
+// Only follow same-site paths, never an external URL passed in ?redirect=
+function redirectTarget(): string {
+  const redirect = route.query.redirect
+  return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+    ? redirect
+    : '/dashboard'
+}
 
 async function handleLogin() {
   if (!email.value || !password.value) {
@@ -15,9 +28,14 @@ async function handleLogin() {
   }
   loading.value = true
   error.value = ''
-  await new Promise(r => setTimeout(r, 800))
-  loading.value = false
-  router.push('/dashboard')
+  try {
+    await sessionStore.login(email.value, password.value)
+    await navigateTo(redirectTarget())
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : 'Something went wrong. Please try again.'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -75,7 +93,7 @@ async function handleLogin() {
       </form>
 
       <p class="mt-4 text-center text-[12px] text-neutral-400">
-        Demo: use any email and password to sign in
+        Demo account: mark@northstarlabs.io / password123
       </p>
     </div>
   </div>
