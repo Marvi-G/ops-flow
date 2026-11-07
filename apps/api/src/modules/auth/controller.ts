@@ -41,7 +41,7 @@ export class AuthController {
 
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const sessionToken = (req.session as any)?.token;
+      const sessionToken = req.cookies?.session;
 
       if (sessionToken) {
         await authService.logout(sessionToken);
@@ -58,7 +58,7 @@ export class AuthController {
 
   async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const sessionToken = (req.session as any)?.token;
+      const sessionToken = req.cookies?.session;
 
       if (!sessionToken) {
         res.clearCookie('session');
@@ -105,7 +105,7 @@ export class AuthController {
         throw new Error('Not authenticated');
       }
 
-      const sessionToken = (req.session as any)?.token;
+      const sessionToken = req.cookies?.session;
       if (!sessionToken) {
         throw new Error('No session');
       }

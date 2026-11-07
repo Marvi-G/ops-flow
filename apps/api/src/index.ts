@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import session from 'express-session';
 import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 
@@ -64,31 +63,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Session configuration
-app.use(
-  session({
-    secret: config.SESSION_SECRET,
-    name: 'opsflow.sid',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: config.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    },
-  })
-);
-
-// Custom session middleware to extract token from cookie
-app.use((req, _res, next) => {
-  const sessionToken = req.cookies?.session;
-  if (sessionToken && req.session) {
-    (req.session as any).token = sessionToken;
-  }
-  next();
-});
-
 // Request ID
 app.use(requestIdMiddleware);
 
@@ -129,31 +103,32 @@ app.use(errorHandler);
 // Initialize database
 createDatabase();
 
-// Start server
-const server = app.listen(config.PORT, () => {
-  logger.info(`🚀 Server running on port ${config.PORT}`);
-  logger.info(`📝 Environment: ${config.NODE_ENV}`);
-});
-
-// Graceful shutdown
-const shutdown = async (signal: string) => {
-  logger.info(`${signal} received, shutting down gracefully...`);
-
-  server.close(async () => {
-    logger.info('HTTP server closed');
-    await disconnectDatabase();
-    logger.info('Database disconnected');
-    process.exit(0);
+if (!process.env.VITEST) {
+  const server = app.listen(config.PORT, () => {
+    logger.info(`🚀 Server running on port ${config.PORT}`);
+    logger.info(`📝 Environment: ${config.NODE_ENV}`);
   });
 
-  // Force exit after 10 seconds
-  setTimeout(() => {
-    logger.error('Could not close connections in time, forcefully shutting down');
-    process.exit(1);
-  }, 10000);
-};
+  // Graceful shutdown
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received, shutting down gracefully...`);
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+    server.close(async () => {
+      logger.info('HTTP server closed');
+      await disconnectDatabase();
+      logger.info('Database disconnected');
+      process.exit(0);
+    });
+
+    // Force exit after 10 seconds
+    setTimeout(() => {
+      logger.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
 
 export default app;

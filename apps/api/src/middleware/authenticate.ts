@@ -9,7 +9,7 @@ export async function authenticate(
   next: NextFunction
 ): Promise<void> {
   try {
-    const sessionToken = (req.session as any)?.token;
+    const sessionToken = req.cookies?.session;
 
     if (!sessionToken) {
       throw new UnauthorizedError('Authentication required');
