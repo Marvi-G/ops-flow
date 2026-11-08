@@ -1,5 +1,5 @@
 <template>
-  <SettingsSettingsLayout>
+  <SettingsLayout>
     <div class="max-w-xl">
       <div class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-300 dark:bg-neutral-100">
         <div class="mb-4 flex items-center justify-between">
@@ -27,5 +27,5 @@
         </div>
       </div>
     </div>
-  </SettingsSettingsLayout>
+  </SettingsLayout>
 </template>

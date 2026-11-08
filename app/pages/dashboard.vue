@@ -1,35 +1,54 @@
 <script setup lang="ts">
-import { dashboardRepository } from '~/services/repository'
-import { incidents, activityEvents, services } from '~/services/mock-data'
+import {
+  ACTIVE_INCIDENT_STATUSES,
+  dashboardRepository,
+  incidentRepository,
+  serviceRepository
+} from '~/services/repository'
+// Recent activity stays on mock data until the audit log exists (Phase 8)
+import { activityEvents } from '~/services/mock-data'
+import { useSessionStore } from '~/stores/session'
 import { formatRelativeTime } from '~/utils'
-import type { DashboardStats } from '~/types'
+import type { DashboardStats, Incident, Service } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
-const stats = ref<DashboardStats>({ activeIncidents: 0, criticalIncidents: 0, servicesAffected: 0, uptime: 0 })
-const loading = ref(true)
+const sessionStore = useSessionStore()
+const firstName = computed(() => sessionStore.user.name.split(' ')[0] ?? '')
 
-const activeIncidents = computed(() =>
-  incidents.filter(i => i.status !== 'resolved' && i.status !== 'postmortem').slice(0, 5)
-)
+const stats = ref<DashboardStats>({ activeIncidents: 0, criticalIncidents: 0, servicesAffected: 0, uptime: 0 })
+const activeIncidents = ref<Incident[]>([])
+const weekIncidents = ref<Incident[]>([])
+const services = ref<Service[]>([])
+const loading = ref(true)
+const loadError = ref('')
 
 const recentActivity = computed(() => activityEvents.slice(0, 6))
 
-const healthyServices = computed(() => services.filter(s => s.status === 'operational').length)
-const totalServices = computed(() => services.length)
+const healthyServices = computed(() => services.value.filter(s => s.status === 'operational').length)
+const totalServices = computed(() => services.value.length)
+const healthPercent = computed(() =>
+  totalServices.value ? Math.round((healthyServices.value / totalServices.value) * 100) : 0
+)
 
-// Generate incident activity data for last 7 days
+// Local calendar day (not UTC), so incidents land on the day the user saw them happen
+function dayKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+// Incidents created per day over the last 7 days
 const incidentActivity = computed(() => {
   const days = []
   for (let i = 6; i >= 0; i--) {
     const date = new Date()
     date.setDate(date.getDate() - i)
-    const dateStr = date.toISOString().split('T')[0]
-    const count = incidents.filter(inc => inc.createdAt.startsWith(dateStr)).length
+    const key = dayKey(date)
     days.push({
-      date: dateStr,
+      date: key,
       label: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      count
+      count: weekIncidents.value.filter(inc => dayKey(new Date(inc.createdAt)) === key).length
     })
   }
   return days
@@ -38,8 +57,26 @@ const incidentActivity = computed(() => {
 const maxIncidentCount = computed(() => Math.max(...incidentActivity.value.map(d => d.count), 1))
 
 onMounted(async () => {
-  stats.value = await dashboardRepository.getStats()
-  loading.value = false
+  try {
+    const weekStart = new Date()
+    weekStart.setHours(0, 0, 0, 0)
+    weekStart.setDate(weekStart.getDate() - 6)
+
+    const [dashboardStats, active, week, allServices] = await Promise.all([
+      dashboardRepository.getStats(),
+      incidentRepository.list({ status: ACTIVE_INCIDENT_STATUSES }, { pageSize: 5 }),
+      incidentRepository.list({ dateFrom: weekStart.toISOString() }, { pageSize: 100 }),
+      serviceRepository.list()
+    ])
+    stats.value = dashboardStats
+    activeIncidents.value = active.data
+    weekIncidents.value = week.data
+    services.value = allServices
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load the dashboard'
+  } finally {
+    loading.value = false
+  }
 })
 
 function getGreeting(): string {
@@ -55,11 +92,15 @@ function getGreeting(): string {
     <!-- Header -->
     <div class="mb-8">
       <h1 class="text-xl font-semibold text-neutral-900 dark:text-neutral-800">
-        {{ getGreeting() }}, Mark
+        {{ getGreeting() }}, {{ firstName }}
       </h1>
       <p class="mt-1 text-[13px] text-neutral-500">
         Here's what's happening across your organization.
       </p>
+    </div>
+
+    <div v-if="loadError" class="mb-6 rounded-md bg-danger-50 p-3 text-[13px] text-danger-500 dark:bg-danger-50/20">
+      {{ loadError }}
     </div>
 
     <!-- Stats -->
@@ -124,7 +165,7 @@ function getGreeting(): string {
               :to="`/incidents/${incident.id}`"
               class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
             >
-              <SeverityBadge :severity="incident.severity" />
+              <SharedSeverityBadge :severity="incident.severity" />
               <div class="min-w-0 flex-1">
                 <p class="truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-800">
                   INC-{{ incident.number }} {{ incident.title }}
@@ -133,7 +174,7 @@ function getGreeting(): string {
                   {{ incident.team?.name }} &middot; {{ formatRelativeTime(incident.createdAt) }}
                 </p>
               </div>
-              <IncidentStatusBadge :status="incident.status" />
+              <IncidentsIncidentStatusBadge :status="incident.status" />
             </NuxtLink>
             <div v-if="activeIncidents.length === 0" class="px-4 py-8 text-center text-[13px] text-neutral-400">
               No active incidents
@@ -155,12 +196,12 @@ function getGreeting(): string {
           <div class="px-4 py-3">
             <div class="mb-3 flex items-center justify-between text-[12px]">
               <span class="text-neutral-500">{{ healthyServices }}/{{ totalServices }} operational</span>
-              <span class="font-medium text-success-500">{{ Math.round((healthyServices / totalServices) * 100) }}%</span>
+              <span class="font-medium text-success-500">{{ healthPercent }}%</span>
             </div>
             <div class="h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-300">
               <div
                 class="h-full rounded-full bg-success-500 transition-all"
-                :style="{ width: `${(healthyServices / totalServices) * 100}%` }"
+                :style="{ width: `${healthPercent}%` }"
               />
             </div>
           </div>

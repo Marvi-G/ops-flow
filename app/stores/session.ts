@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import type { User, Organization, Notification } from '~/types'
 import { notifications as mockNotifications } from '~/services/mock-data'
 import { api, ApiError } from '~/services/api'
-import { mapSession, type ApiMe } from '~/services/mappers'
+import { mapSession, type ApiMe, type ApiOrganization } from '~/services/mappers'
 
 // Components read user/organization without null checks. The auth middleware keeps
 // protected pages from rendering until fetchMe() has filled these in.
@@ -38,7 +38,10 @@ export const useSessionStore = defineStore('session', () => {
   async function fetchMe(): Promise<boolean> {
     try {
       const me = await api.get<ApiMe>('/auth/me')
-      const session = mapSession(me)
+      // Plan and member counts for the organization switcher. Fetched only once the
+      // session is known to be valid, and the session still works if this fails.
+      const organizations = await api.get<ApiOrganization[]>('/organizations').catch(() => [])
+      const session = mapSession(me, organizations)
       user.value = session.user
       organization.value = session.organization
       allOrganizations.value = session.allOrganizations

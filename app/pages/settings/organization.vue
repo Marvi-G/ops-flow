@@ -12,7 +12,7 @@ const form = reactive({
 </script>
 
 <template>
-  <SettingsSettingsLayout>
+  <SettingsLayout>
     <div class="max-w-xl">
       <div class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-300 dark:bg-neutral-100">
         <h2 class="mb-4 text-[14px] font-semibold text-neutral-900 dark:text-neutral-800">Organization details</h2>
@@ -45,5 +45,5 @@ const form = reactive({
         </div>
       </div>
     </div>
-  </SettingsSettingsLayout>
+  </SettingsLayout>
 </template>

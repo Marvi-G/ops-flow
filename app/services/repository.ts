@@ -10,6 +10,7 @@ import type {
   User,
   Organization,
   IncidentFilters,
+  IncidentStatus,
   PaginationState,
   DashboardStats
 } from '~/types'
@@ -17,24 +18,33 @@ import type {
 import {
   incidents as mockIncidents,
   activityEvents as mockActivity,
-  notifications as mockNotifications,
-  users as mockUsers,
-  currentUser as mockCurrentUser,
-  currentOrganization as mockOrg,
-  organizations as mockOrganizations
+  notifications as mockNotifications
 } from './mock-data'
 import { api, ApiError } from './api'
 import {
   mapComment,
   mapIncident,
+  mapOrganization,
+  mapOrgUser,
   mapProject,
   mapRelatedIncident,
   mapService,
+  mapSession,
   mapTeam,
   mapTimelineEvent,
   serializeIncidentFilters
 } from './mappers'
-import type { ApiIncident, ApiIncidentDetail, ApiProject, ApiService, ApiTeam, IncidentSort } from './mappers'
+import type {
+  ApiIncident,
+  ApiIncidentDetail,
+  ApiMe,
+  ApiOrganization,
+  ApiOrgUser,
+  ApiProject,
+  ApiService,
+  ApiTeam,
+  IncidentSort
+} from './mappers'
 
 function delay(ms = 200): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -149,37 +159,52 @@ export const notificationRepository = {
 
 export const userRepository = {
   async getCurrent(): Promise<User> {
-    await delay(100)
-    return { ...mockCurrentUser }
+    return mapSession(await api.get<ApiMe>('/auth/me')).user
   },
 
+  /** Members of the current organization (needs the members.read permission). */
   async list(): Promise<User[]> {
-    await delay()
-    return [...mockUsers]
+    return (await api.get<ApiOrgUser[]>('/users')).map(u => mapOrgUser(u))
   }
 }
 
 export const organizationRepository = {
   async getCurrent(): Promise<Organization> {
-    await delay(100)
-    return { ...mockOrg }
+    return mapOrganization(await api.get<ApiOrganization>('/organizations/current'))
   },
 
   async list(): Promise<Organization[]> {
-    await delay()
-    return [...mockOrganizations]
+    return (await api.get<ApiOrganization[]>('/organizations')).map(mapOrganization)
   }
 }
 
+/** Incidents that still need attention (everything before resolved / post-mortem). */
+export const ACTIVE_INCIDENT_STATUSES: IncidentStatus[] = ['investigating', 'identified', 'monitoring']
+
 export const dashboardRepository = {
+  /**
+   * Built from the incident and service endpoints until a dedicated stats endpoint
+   * exists (Phase 9). "Services affected" looks at the 100 most recent active incidents.
+   */
   async getStats(): Promise<DashboardStats> {
-    await delay()
-    const active = mockIncidents.filter(i => i.status !== 'resolved' && i.status !== 'postmortem')
+    const status = ACTIVE_INCIDENT_STATUSES.join(',')
+    const [active, critical, services] = await Promise.all([
+      api.list<ApiIncident>('/incidents', { status, pageSize: 100 }),
+      api.list<ApiIncident>('/incidents', { status, severity: 'critical', pageSize: 1 }),
+      api.get<ApiService[]>('/services')
+    ])
+
+    // Services that were never measured report 0 and shouldn't drag the average down
+    const measured = services.map(s => Number(s.uptime)).filter(uptime => uptime > 0)
+    const uptime = measured.length
+      ? Math.round((measured.reduce((sum, value) => sum + value, 0) / measured.length) * 100) / 100
+      : 0
+
     return {
-      activeIncidents: active.length,
-      criticalIncidents: active.filter(i => i.severity === 'critical').length,
-      servicesAffected: new Set(active.flatMap(i => i.serviceIds)).size,
-      uptime: 99.94
+      activeIncidents: active.meta.total,
+      criticalIncidents: critical.meta.total,
+      servicesAffected: new Set(active.data.flatMap(incident => incident.services.map(s => s.id))).size,
+      uptime
     }
   }
 }

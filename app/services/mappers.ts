@@ -35,19 +35,53 @@ export interface ApiMe {
   organizations: { id: string, name: string, slug: string, role: OrgRole }[]
 }
 
-/**
- * Maps /auth/me onto the frontend session types. The API does not return
- * memberCount/createdAt yet (Phase 6), and only the current organization's plan.
- */
-export function mapSession(me: ApiMe): { user: User, organization: Organization, allOrganizations: Organization[] } {
-  const toOrganization = (o: { id: string, name: string, slug: string }, plan: string): Organization => ({
+/** GET /api/organizations and /api/organizations/current */
+export interface ApiOrganization {
+  id: string
+  name: string
+  slug: string
+  plan: string
+  createdAt: string
+  _count: { members: number }
+}
+
+const ORG_PLANS: Organization['plan'][] = ['free', 'pro', 'enterprise']
+
+export function mapOrganization(o: ApiOrganization): Organization {
+  return {
     id: o.id,
     name: o.name,
     slug: o.slug,
-    plan: plan as Organization['plan'],
-    memberCount: 0,
-    createdAt: ''
-  })
+    plan: ORG_PLANS.includes(o.plan as Organization['plan']) ? o.plan as Organization['plan'] : 'free',
+    memberCount: o._count.members,
+    createdAt: o.createdAt
+  }
+}
+
+/**
+ * Maps /auth/me onto the frontend session types. /auth/me only has the plan of the
+ * current organization and no member counts, so pass the result of GET /organizations
+ * to fill those in for every organization.
+ */
+export function mapSession(
+  me: ApiMe,
+  organizations: ApiOrganization[] = []
+): { user: User, organization: Organization, allOrganizations: Organization[] } {
+  const details = new Map(organizations.map(o => [o.id, o]))
+
+  const toOrganization = (o: { id: string, name: string, slug: string }, fallbackPlan: string): Organization => {
+    const detail = details.get(o.id)
+    return detail
+      ? mapOrganization(detail)
+      : {
+          id: o.id,
+          name: o.name,
+          slug: o.slug,
+          plan: ORG_PLANS.includes(fallbackPlan as Organization['plan']) ? fallbackPlan as Organization['plan'] : 'free',
+          memberCount: 0,
+          createdAt: ''
+        }
+  }
 
   return {
     user: {
@@ -62,6 +96,27 @@ export function mapSession(me: ApiMe): { user: User, organization: Organization,
     allOrganizations: me.organizations.map(o =>
       toOrganization(o, o.id === me.organization.id ? me.organization.plan : 'free')
     )
+  }
+}
+
+/** GET /api/users: the members of the current organization, flattened with their role. */
+export interface ApiOrgUser {
+  id: string
+  email: string
+  name: string
+  avatar: string | null
+  role: OrgRole
+  joinedAt: string
+}
+
+export function mapOrgUser(u: ApiOrgUser, organizationId = ''): User {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    avatar: u.avatar ?? undefined,
+    role: u.role,
+    organizationId
   }
 }
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useAppStore } from '~/stores/app'
 import { useColorMode } from '#imports'
-import { incidents, projects, services } from '~/services/mock-data'
+import { incidentRepository, projectRepository, serviceRepository } from '~/services/repository'
+import type { Incident, Project, Service } from '~/types'
 
 const appStore = useAppStore()
 const router = useRouter()
@@ -9,6 +10,12 @@ const colorMode = useColorMode()
 
 const search = ref('')
 const selectedIndex = ref(0)
+
+// Projects and services are small lists, loaded each time the palette opens and filtered
+// here. Incidents can be many, so they are searched on the server as the user types.
+const projects = ref<Project[]>([])
+const services = ref<Service[]>([])
+const incidentResults = ref<Incident[]>([])
 
 interface PaletteItem {
   id: string
@@ -34,76 +41,35 @@ const staticItems: PaletteItem[] = [
   { id: 'theme-toggle', label: 'Toggle Dark Mode', icon: 'i-lucide-moon', category: 'Actions', action: () => toggleTheme() }
 ]
 
-// Entity search items
-const incidentItems = computed<PaletteItem[]>(() =>
-  incidents.slice(0, 5).map(inc => ({
-    id: `incident-${inc.id}`,
-    label: `INC-${inc.number} ${inc.title}`,
-    description: `${inc.severity} · ${inc.status}`,
-    icon: 'i-lucide-alert-triangle',
-    category: 'Incidents',
-    action: () => navigate(`/incidents/${inc.id}`)
-  }))
-)
-
-const projectItems = computed<PaletteItem[]>(() =>
-  projects.slice(0, 5).map(proj => ({
-    id: `project-${proj.id}`,
-    label: proj.name,
-    description: proj.description,
-    icon: 'i-lucide-folder-kanban',
-    category: 'Projects',
-    action: () => navigate(`/projects/${proj.id}`)
-  }))
-)
-
-const serviceItems = computed<PaletteItem[]>(() =>
-  services.slice(0, 5).map(svc => ({
-    id: `service-${svc.id}`,
-    label: svc.name,
-    description: `${svc.status} · ${svc.uptime}% uptime`,
-    icon: 'i-lucide-server',
-    category: 'Services',
-    action: () => navigate(`/services/${svc.id}`)
-  }))
-)
-
 const filteredItems = computed(() => {
   if (!search.value) return staticItems
 
-  const q = search.value.toLowerCase()
+  const q = search.value.trim().toLowerCase()
 
   // Search across all categories
   const results: PaletteItem[] = []
 
-  // Static items
+  // Pages and actions
   for (const item of staticItems) {
     if (item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q)) {
       results.push(item)
     }
   }
 
-  // Incidents
-  for (const inc of incidents) {
-    if (
-      inc.title.toLowerCase().includes(q) ||
-      `inc-${inc.number}`.toLowerCase().includes(q) ||
-      inc.severity.toLowerCase().includes(q) ||
-      inc.status.toLowerCase().includes(q)
-    ) {
-      results.push({
-        id: `incident-${inc.id}`,
-        label: `INC-${inc.number} ${inc.title}`,
-        description: `${inc.severity} · ${inc.status}`,
-        icon: 'i-lucide-alert-triangle',
-        category: 'Incidents',
-        action: () => navigate(`/incidents/${inc.id}`)
-      })
-    }
+  // Incidents (already filtered by the server: title, description or INC-number)
+  for (const inc of incidentResults.value) {
+    results.push({
+      id: `incident-${inc.id}`,
+      label: `INC-${inc.number} ${inc.title}`,
+      description: `${inc.severity} · ${inc.status}`,
+      icon: 'i-lucide-alert-triangle',
+      category: 'Incidents',
+      action: () => navigate(`/incidents/${inc.id}`)
+    })
   }
 
   // Projects
-  for (const proj of projects) {
+  for (const proj of projects.value) {
     if (proj.name.toLowerCase().includes(q) || proj.description.toLowerCase().includes(q)) {
       results.push({
         id: `project-${proj.id}`,
@@ -117,7 +83,7 @@ const filteredItems = computed(() => {
   }
 
   // Services
-  for (const svc of services) {
+  for (const svc of services.value) {
     if (svc.name.toLowerCase().includes(q) || svc.description.toLowerCase().includes(q)) {
       results.push({
         id: `service-${svc.id}`,
@@ -136,8 +102,8 @@ const filteredItems = computed(() => {
 const groupedItems = computed(() => {
   const groups: Record<string, PaletteItem[]> = {}
   for (const item of filteredItems.value) {
-    if (!groups[item.category]) groups[item.category] = []
-    groups[item.category].push(item)
+    const group = groups[item.category] ?? (groups[item.category] = [])
+    group.push(item)
   }
   return groups
 })
@@ -165,9 +131,12 @@ function onKeydown(e: KeyboardEvent) {
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
     selectedIndex.value = Math.max(selectedIndex.value - 1, 0)
-  } else if (e.key === 'Enter' && flatItems.value[selectedIndex.value]) {
-    e.preventDefault()
-    selectItem(flatItems.value[selectedIndex.value])
+  } else if (e.key === 'Enter') {
+    const item = flatItems.value[selectedIndex.value]
+    if (item) {
+      e.preventDefault()
+      selectItem(item)
+    }
   }
 }
 
@@ -187,17 +156,50 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onGlobalKeydown)
 })
 
+async function loadEntities() {
+  try {
+    [projects.value, services.value] = await Promise.all([projectRepository.list(), serviceRepository.list()])
+  } catch {
+    // The palette still offers pages and actions without them
+  }
+}
+
 watch(() => appStore.commandPaletteOpen, (open) => {
   if (open) {
     search.value = ''
     selectedIndex.value = 0
+    incidentResults.value = []
+    loadEntities()
   }
 })
 
-// Reset selection when search changes
-watch(search, () => {
+// Incident search is debounced, and only the latest request may write its results
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+let searchRequestId = 0
+
+watch(search, (value) => {
   selectedIndex.value = 0
+  clearTimeout(searchTimer)
+
+  const query = value.trim()
+  if (!query) {
+    searchRequestId++
+    incidentResults.value = []
+    return
+  }
+
+  searchTimer = setTimeout(async () => {
+    const requestId = ++searchRequestId
+    try {
+      const result = await incidentRepository.list({ search: query }, { pageSize: 5 })
+      if (requestId === searchRequestId) incidentResults.value = result.data
+    } catch {
+      if (requestId === searchRequestId) incidentResults.value = []
+    }
+  }, 250)
 })
+
+onUnmounted(() => clearTimeout(searchTimer))
 </script>
 
 <template>

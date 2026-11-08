@@ -1,18 +1,41 @@
 <script setup lang="ts">
-import { users } from '~/services/mock-data'
+import { userRepository } from '~/services/repository'
+import type { User } from '~/types'
 
 definePageMeta({ layout: 'default' })
+
+const users = ref<User[]>([])
+const loading = ref(true)
+const loadError = ref('')
+
+onMounted(async () => {
+  try {
+    users.value = await userRepository.list()
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load members'
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
-  <SettingsSettingsLayout>
+  <SettingsLayout>
     <div>
       <div class="mb-4 flex items-center justify-between">
-        <p class="text-[13px] text-neutral-500">{{ users.length }} members</p>
+        <p class="text-[13px] text-neutral-500">{{ loading ? 'Loading members...' : `${users.length} members` }}</p>
         <UButton color="primary" size="sm" icon="i-lucide-user-plus" label="Invite member" />
       </div>
 
-      <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+      <div v-if="loading">
+        <SharedLoadingSkeleton :rows="4" :columns="3" />
+      </div>
+
+      <div v-else-if="loadError" class="rounded-md bg-danger-50 p-3 text-[13px] text-danger-500 dark:bg-danger-50/20">
+        {{ loadError }}
+      </div>
+
+      <div v-else class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
         <div class="divide-y divide-neutral-200 dark:divide-neutral-300">
           <div
             v-for="user in users"
@@ -42,5 +65,5 @@ definePageMeta({ layout: 'default' })
         </div>
       </div>
     </div>
-  </SettingsSettingsLayout>
+  </SettingsLayout>
 </template>

@@ -1,10 +1,36 @@
 <script setup lang="ts">
-import { teams, services, users } from '~/services/mock-data'
-import { projects } from '~/services/mock-data'
+import { projectRepository, serviceRepository, teamRepository, userRepository } from '~/services/repository'
+import type { Project, Service, Team, User } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const router = useRouter()
+
+// Options for the dropdowns
+const teams = ref<Team[]>([])
+const services = ref<Service[]>([])
+const projects = ref<Project[]>([])
+const users = ref<User[]>([])
+const optionsError = ref('')
+
+onMounted(async () => {
+  // Each list loads on its own, so one failing (e.g. no permission to list members)
+  // doesn't empty the others
+  const results = await Promise.allSettled([
+    teamRepository.list(),
+    serviceRepository.list(),
+    projectRepository.list(),
+    userRepository.list()
+  ])
+  const [teamList, serviceList, projectList, userList] = results
+  if (teamList.status === 'fulfilled') teams.value = teamList.value
+  if (serviceList.status === 'fulfilled') services.value = serviceList.value
+  if (projectList.status === 'fulfilled') projects.value = projectList.value
+  if (userList.status === 'fulfilled') users.value = userList.value
+  if (results.some(r => r.status === 'rejected')) {
+    optionsError.value = 'Some options could not be loaded.'
+  }
+})
 
 const form = reactive({
   title: '',
@@ -16,13 +42,12 @@ const form = reactive({
   assigneeId: ''
 })
 
-const errors = reactive<Record<string, string>>({})
+const errors = ref<Record<string, string>>({})
 const submitting = ref(false)
 const submitted = ref(false)
 const submitError = ref('')
 const dirty = ref(false)
 const showUnsavedDialog = ref(false)
-const pendingNavigation = ref<string | null>(null)
 
 watch(form, () => { dirty.value = true }, { deep: true })
 
@@ -67,8 +92,7 @@ function validate(): boolean {
   if (!form.description.trim()) e.description = 'Description is required'
   if (!form.severity) e.severity = 'Severity is required'
   if (!form.teamId) e.teamId = 'Team is required'
-  Object.keys(errors).forEach(k => delete errors[k])
-  Object.assign(errors, e)
+  errors.value = e
   return Object.keys(e).length === 0
 }
 
@@ -116,6 +140,8 @@ const severityOptions = [
 
     <!-- Form -->
     <form v-else class="space-y-5" @submit.prevent="handleSubmit">
+      <p v-if="optionsError" class="text-[12px] text-warning-500">{{ optionsError }}</p>
+
       <!-- Error state -->
       <div v-if="submitError" class="rounded-lg border border-danger-500/20 bg-danger-50 p-4 dark:bg-danger-50/10">
         <div class="flex items-start gap-3">
