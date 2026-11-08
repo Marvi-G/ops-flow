@@ -1,5 +1,11 @@
+// Optional dates come through as '' (e.g. a service that was never deployed)
+function isValidDate(d: Date): boolean {
+  return !Number.isNaN(d.getTime())
+}
+
 export function formatDate(date: string | Date): string {
   const d = new Date(date)
+  if (!isValidDate(d)) return '-'
   return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -9,6 +15,7 @@ export function formatDate(date: string | Date): string {
 
 export function formatDateTime(date: string | Date): string {
   const d = new Date(date)
+  if (!isValidDate(d)) return '-'
   return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -20,6 +27,7 @@ export function formatDateTime(date: string | Date): string {
 
 export function formatTime(date: string | Date): string {
   const d = new Date(date)
+  if (!isValidDate(d)) return '-'
   return d.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit'
@@ -28,6 +36,7 @@ export function formatTime(date: string | Date): string {
 
 export function formatRelativeTime(date: string | Date): string {
   const d = new Date(date)
+  if (!isValidDate(d)) return '-'
   const now = new Date()
   const diffMs = now.getTime() - d.getTime()
   const diffMins = Math.floor(diffMs / 60000)

@@ -5,11 +5,16 @@ import { serviceRepository } from '~/services/repository'
 export function useServices() {
   const services = ref<Service[]>([])
   const loading = ref(false)
+  const error = ref('')
 
   async function fetch() {
     loading.value = true
+    error.value = ''
     try {
       services.value = await serviceRepository.list()
+    } catch (err) {
+      services.value = []
+      error.value = err instanceof Error ? err.message : 'Failed to load services'
     } finally {
       loading.value = false
     }
@@ -24,5 +29,5 @@ export function useServices() {
     }
   }
 
-  return { services, loading, fetch, fetchById }
+  return { services, loading, error, fetch, fetchById }
 }

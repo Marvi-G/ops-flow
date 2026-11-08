@@ -1,21 +1,42 @@
 <script setup lang="ts">
 import { useProjects } from '~/composables/useProjects'
-import { services, incidents } from '~/services/mock-data'
+import { incidentRepository, serviceRepository } from '~/services/repository'
 import { formatRelativeTime } from '~/utils'
+import type { Incident, Project, Service } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const route = useRoute()
 const projectId = route.params.id as string
-const { fetchById, loading } = useProjects()
-const project = ref<any>(null)
+const { fetchById } = useProjects()
+const project = ref<Project | null>(null)
+const projectServices = ref<Service[]>([])
+const projectIncidents = ref<Incident[]>([])
+const loaded = ref(false)
+const loadError = ref('')
 const activeTab = ref('overview')
 
-const projectServices = computed(() => services.filter(s => s.projectId === projectId))
-const projectIncidents = computed(() => incidents.filter(i => i.serviceIds.some(sid => projectServices.value.some(s => s.id === sid))))
-
 onMounted(async () => {
-  project.value = await fetchById(projectId)
+  try {
+    project.value = (await fetchById(projectId)) ?? null
+    if (project.value) {
+      const allServices = await serviceRepository.list()
+      projectServices.value = allServices.filter(s => s.projectId === projectId)
+
+      // A project's incidents are the ones affecting its services
+      if (projectServices.value.length) {
+        const result = await incidentRepository.list(
+          { serviceId: projectServices.value.map(s => s.id) },
+          { pageSize: 20 }
+        )
+        projectIncidents.value = result.data
+      }
+    }
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load the project'
+  } finally {
+    loaded.value = true
+  }
 })
 
 const tabs = ['overview', 'services', 'incidents', 'activity']
@@ -23,8 +44,16 @@ const tabs = ['overview', 'services', 'incidents', 'activity']
 
 <template>
   <div>
-    <div v-if="loading || !project" class="space-y-4">
+    <div v-if="!loaded" class="space-y-4">
       <SharedLoadingSkeleton :rows="3" :columns="3" />
+    </div>
+
+    <div v-else-if="loadError || !project" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+      <SharedEmptyState
+        icon="i-lucide-folder-kanban"
+        :title="loadError ? 'Couldn\'t load the project' : 'Project not found'"
+        :description="loadError || 'The project you\'re looking for doesn\'t exist.'"
+      />
     </div>
 
     <div v-else>

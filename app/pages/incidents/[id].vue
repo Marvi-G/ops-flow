@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { incidentRepository } from '~/services/repository'
-import { incidents as allIncidents } from '~/services/mock-data'
 import type { Incident, IncidentStatus, TimelineEvent, Comment } from '~/types'
 import { formatDateTime, formatTime, formatRelativeTime } from '~/utils'
 
@@ -12,21 +11,31 @@ const incidentId = route.params.id as string
 const incident = ref<Incident | null>(null)
 const timeline = ref<TimelineEvent[]>([])
 const incidentComments = ref<Comment[]>([])
+const relatedIncidents = ref<Awaited<ReturnType<typeof incidentRepository.getRelated>>>([])
 const loading = ref(true)
+const loadError = ref('')
 const activeTab = ref<'timeline' | 'comments' | 'activity'>('timeline')
 const newComment = ref('')
 const transitioning = ref(false)
 
 onMounted(async () => {
-  const [inc, tl, cmts] = await Promise.all([
-    incidentRepository.getById(incidentId),
-    incidentRepository.getTimeline(incidentId),
-    incidentRepository.getComments(incidentId)
-  ])
-  incident.value = inc || null
-  timeline.value = tl
-  incidentComments.value = cmts
-  loading.value = false
+  try {
+    // One request behind the scenes; the repository shares it between these calls
+    const [inc, tl, cmts, related] = await Promise.all([
+      incidentRepository.getById(incidentId),
+      incidentRepository.getTimeline(incidentId),
+      incidentRepository.getComments(incidentId),
+      incidentRepository.getRelated(incidentId)
+    ])
+    incident.value = inc || null
+    timeline.value = tl
+    incidentComments.value = cmts
+    relatedIncidents.value = related
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load the incident'
+  } finally {
+    loading.value = false
+  }
 })
 
 const timelineIcon: Record<string, string> = {
@@ -88,26 +97,16 @@ async function transitionTo(status: IncidentStatus) {
   await new Promise(r => setTimeout(r, 300))
   transitioning.value = false
 }
-
-// Related incidents - same service or team
-const relatedIncidents = computed(() => {
-  if (!incident.value) return []
-  return allIncidents
-    .filter(i =>
-      i.id !== incident.value!.id &&
-      (
-        i.serviceIds.some(sid => incident.value!.serviceIds.includes(sid)) ||
-        i.teamId === incident.value!.teamId
-      )
-    )
-    .slice(0, 5)
-})
 </script>
 
 <template>
   <div>
     <div v-if="loading" class="space-y-4">
       <SharedLoadingSkeleton :rows="3" :columns="3" />
+    </div>
+
+    <div v-else-if="loadError" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+      <SharedEmptyState icon="i-lucide-alert-triangle" title="Couldn't load the incident" :description="loadError" />
     </div>
 
     <div v-else-if="!incident" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">

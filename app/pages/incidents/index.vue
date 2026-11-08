@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { useIncidentFilters } from '~/composables/useIncidentFilters'
-import { incidentRepository } from '~/services/repository'
-import { teams, services } from '~/services/mock-data'
+import { incidentRepository, serviceRepository, teamRepository } from '~/services/repository'
 import { formatRelativeTime } from '~/utils'
-import type { Incident } from '~/types'
+import type { Incident, IncidentSeverity, IncidentStatus, Service, Team } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
@@ -11,6 +10,11 @@ const { filters, updateFilter, toggleArrayFilter, resetFilters, hasActiveFilters
 
 const incidents = ref<Incident[]>([])
 const loading = ref(true)
+const loadError = ref('')
+
+// Options for the team and service filter dropdowns
+const teams = ref<Team[]>([])
+const services = ref<Service[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
@@ -21,6 +25,19 @@ const showColumnMenu = ref(false)
 // Sort state
 const sortField = ref<'created' | 'updated' | 'severity'>('created')
 const sortDir = ref<'asc' | 'desc'>('desc')
+
+// The sort dropdown holds "field-dir" (e.g. "severity-desc")
+const sortValue = computed({
+  get: () => `${sortField.value}-${sortDir.value}`,
+  set: (value: string) => {
+    const [field, dir] = value.split('-')
+    const option = sortOptions.find(o => o.field === field && o.dir === dir)
+    if (option) {
+      sortField.value = option.field
+      sortDir.value = option.dir
+    }
+  }
+})
 
 // Selection state
 const selectedIds = ref<Set<string>>(new Set())
@@ -50,14 +67,14 @@ const columnOptions = [
   { key: 'updated', label: 'Updated' }
 ]
 
-const severityOptions = [
+const severityOptions: { label: string, value: IncidentSeverity }[] = [
   { label: 'Critical', value: 'critical' },
   { label: 'High', value: 'high' },
   { label: 'Medium', value: 'medium' },
   { label: 'Low', value: 'low' }
 ]
 
-const statusOptions = [
+const statusOptions: { label: string, value: IncidentStatus }[] = [
   { label: 'Investigating', value: 'investigating' },
   { label: 'Identified', value: 'identified' },
   { label: 'Monitoring', value: 'monitoring' },
@@ -65,7 +82,7 @@ const statusOptions = [
   { label: 'Post-mortem', value: 'postmortem' }
 ]
 
-const sortOptions = [
+const sortOptions: { label: string, field: 'created' | 'updated' | 'severity', dir: 'asc' | 'desc' }[] = [
   { label: 'Newest first', field: 'created', dir: 'desc' },
   { label: 'Oldest first', field: 'created', dir: 'asc' },
   { label: 'Recently updated', field: 'updated', dir: 'desc' },
@@ -75,26 +92,20 @@ const sortOptions = [
 // Fetch incidents
 async function fetchIncidents() {
   loading.value = true
+  loadError.value = ''
   try {
-    const result = await incidentRepository.list(filters.value, { page: page.value, pageSize })
-    let data = result.data
+    // Sorting happens on the server so it applies across all pages, not just this one
+    const result = await incidentRepository.list(
+      filters.value,
+      { page: page.value, pageSize },
+      { field: sortField.value, dir: sortDir.value }
+    )
+    incidents.value = result.data
     total.value = result.total
-
-    // Client-side sort
-    const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
-    data = [...data].sort((a, b) => {
-      let cmp = 0
-      if (sortField.value === 'created') {
-        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      } else if (sortField.value === 'updated') {
-        cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
-      } else if (sortField.value === 'severity') {
-        cmp = severityOrder[a.severity] - severityOrder[b.severity]
-      }
-      return sortDir.value === 'desc' ? -cmp : cmp
-    })
-
-    incidents.value = data
+  } catch (err) {
+    incidents.value = []
+    total.value = 0
+    loadError.value = err instanceof Error ? err.message : 'Failed to load incidents'
   } finally {
     loading.value = false
   }
@@ -110,8 +121,13 @@ watch(page, () => {
   fetchIncidents()
 })
 
-onMounted(() => {
+onMounted(async () => {
   fetchIncidents()
+  try {
+    ;[teams.value, services.value] = await Promise.all([teamRepository.list(), serviceRepository.list()])
+  } catch {
+    // The dropdowns just stay empty; the incident list reports its own errors
+  }
 })
 
 // Selection
@@ -169,6 +185,10 @@ const activeFilterCount = computed(() => {
       </template>
     </SharedPageHeader>
 
+    <div v-if="loadError" class="mb-4 rounded-md bg-danger-50 p-3 text-[13px] text-danger-500 dark:bg-danger-50/20">
+      {{ loadError }}
+    </div>
+
     <!-- Controls -->
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex flex-1 items-center gap-2">
@@ -224,9 +244,9 @@ const activeFilterCount = computed(() => {
       </div>
       <div class="flex items-center gap-2">
         <select
-          :value="`${sortField.value}-${sortDir.value}`"
+          :value="sortValue"
           class="h-8 rounded-md border border-neutral-200 bg-white px-2.5 text-[13px] text-neutral-700 focus:border-primary-500 focus:outline-none dark:border-neutral-300 dark:bg-neutral-100 dark:text-neutral-600"
-          @change="const [f, d] = ($event.target as HTMLSelectElement).value.split('-'); sortField.value = f as any; sortDir.value = d as any"
+          @change="sortValue = ($event.target as HTMLSelectElement).value"
         >
           <option v-for="opt in sortOptions" :key="`${opt.field}-${opt.dir}`" :value="`${opt.field}-${opt.dir}`">{{ opt.label }}</option>
         </select>

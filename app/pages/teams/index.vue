@@ -3,7 +3,7 @@ import { useTeams } from '~/composables/useTeams'
 
 definePageMeta({ layout: 'default' })
 
-const { teams, loading, fetch: fetchTeams } = useTeams()
+const { teams, loading, error, fetch: fetchTeams } = useTeams()
 const search = ref('')
 
 const filteredTeams = computed(() => {
@@ -38,6 +38,10 @@ onMounted(() => fetchTeams())
 
     <div v-if="loading">
       <SharedLoadingSkeleton :rows="4" :columns="3" />
+    </div>
+
+    <div v-else-if="error" class="rounded-md bg-danger-50 p-3 text-[13px] text-danger-500 dark:bg-danger-50/20">
+      {{ error }}
     </div>
 
     <div v-else-if="filteredTeams.length === 0">

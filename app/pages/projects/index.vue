@@ -4,7 +4,7 @@ import { formatRelativeTime } from '~/utils'
 
 definePageMeta({ layout: 'default' })
 
-const { projects, loading, fetch: fetchProjects } = useProjects()
+const { projects, loading, error, fetch: fetchProjects } = useProjects()
 const search = ref('')
 
 const filteredProjects = computed(() => {
@@ -42,6 +42,10 @@ onMounted(() => fetchProjects())
 
     <div v-if="loading">
       <SharedLoadingSkeleton :rows="4" :columns="3" />
+    </div>
+
+    <div v-else-if="error" class="rounded-md bg-danger-50 p-3 text-[13px] text-danger-500 dark:bg-danger-50/20">
+      {{ error }}
     </div>
 
     <div v-else-if="filteredProjects.length === 0">

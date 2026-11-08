@@ -1,21 +1,39 @@
 <script setup lang="ts">
 import { useTeams } from '~/composables/useTeams'
-import { projects, incidents } from '~/services/mock-data'
+import { incidentRepository, projectRepository } from '~/services/repository'
 import { formatRelativeTime } from '~/utils'
+import type { Incident, Project, Team } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const route = useRoute()
 const teamId = route.params.id as string
-const { fetchById, loading } = useTeams()
-const team = ref<any>(null)
+const { fetchById } = useTeams()
+const team = ref<Team | null>(null)
+const teamProjects = ref<Project[]>([])
+const teamIncidents = ref<Incident[]>([])
+const teamIncidentTotal = ref(0)
+const loaded = ref(false)
+const loadError = ref('')
 const activeTab = ref('members')
 
-const teamProjects = computed(() => projects.filter(p => p.teamId === teamId))
-const teamIncidents = computed(() => incidents.filter(i => i.teamId === teamId))
-
 onMounted(async () => {
-  team.value = await fetchById(teamId)
+  try {
+    team.value = (await fetchById(teamId)) ?? null
+    if (team.value) {
+      const [allProjects, incidentResult] = await Promise.all([
+        projectRepository.list(),
+        incidentRepository.list({ teamId: [teamId] }, { pageSize: 20 })
+      ])
+      teamProjects.value = allProjects.filter(p => p.teamId === teamId)
+      teamIncidents.value = incidentResult.data
+      teamIncidentTotal.value = incidentResult.total
+    }
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load the team'
+  } finally {
+    loaded.value = true
+  }
 })
 
 const tabs = ['members', 'projects', 'incidents', 'activity']
@@ -23,8 +41,16 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
 
 <template>
   <div>
-    <div v-if="loading || !team" class="space-y-4">
+    <div v-if="!loaded" class="space-y-4">
       <SharedLoadingSkeleton :rows="3" :columns="3" />
+    </div>
+
+    <div v-else-if="loadError || !team" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+      <SharedEmptyState
+        icon="i-lucide-users"
+        :title="loadError ? 'Couldn\'t load the team' : 'Team not found'"
+        :description="loadError || 'The team you\'re looking for doesn\'t exist.'"
+      />
     </div>
 
     <div v-else>
@@ -46,7 +72,7 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
           {{ tab }}
           <span v-if="tab === 'members'" class="ml-1 text-[11px] text-neutral-400">({{ team.members.length }})</span>
           <span v-if="tab === 'projects'" class="ml-1 text-[11px] text-neutral-400">({{ teamProjects.length }})</span>
-          <span v-if="tab === 'incidents'" class="ml-1 text-[11px] text-neutral-400">({{ teamIncidents.length }})</span>
+          <span v-if="tab === 'incidents'" class="ml-1 text-[11px] text-neutral-400">({{ teamIncidentTotal }})</span>
         </button>
       </div>
 

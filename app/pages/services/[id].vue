@@ -1,21 +1,31 @@
 <script setup lang="ts">
 import { useServices } from '~/composables/useServices'
-import { incidents } from '~/services/mock-data'
+import { incidentRepository } from '~/services/repository'
 import { formatRelativeTime, formatDateTime } from '~/utils'
+import type { Incident, Service } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const route = useRoute()
 const serviceId = route.params.id as string
-const { fetchById, loading } = useServices()
-const service = ref<any>(null)
-
-const serviceIncidents = computed(() =>
-  incidents.filter(i => i.serviceIds.includes(serviceId)).slice(0, 5)
-)
+const { fetchById } = useServices()
+const service = ref<Service | null>(null)
+const serviceIncidents = ref<Incident[]>([])
+const loaded = ref(false)
+const loadError = ref('')
 
 onMounted(async () => {
-  service.value = await fetchById(serviceId)
+  try {
+    service.value = (await fetchById(serviceId)) ?? null
+    if (service.value) {
+      const result = await incidentRepository.list({ serviceId: [serviceId] }, { pageSize: 5 })
+      serviceIncidents.value = result.data
+    }
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load the service'
+  } finally {
+    loaded.value = true
+  }
 })
 
 // Mock uptime data for chart
@@ -27,8 +37,16 @@ const uptimeData = Array.from({ length: 30 }, (_, i) => ({
 
 <template>
   <div>
-    <div v-if="loading || !service" class="space-y-4">
+    <div v-if="!loaded" class="space-y-4">
       <SharedLoadingSkeleton :rows="3" :columns="3" />
+    </div>
+
+    <div v-else-if="loadError || !service" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+      <SharedEmptyState
+        icon="i-lucide-server"
+        :title="loadError ? 'Couldn\'t load the service' : 'Service not found'"
+        :description="loadError || 'The service you\'re looking for doesn\'t exist.'"
+      />
     </div>
 
     <div v-else>

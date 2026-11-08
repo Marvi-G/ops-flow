@@ -16,72 +16,84 @@ import type {
 
 import {
   incidents as mockIncidents,
-  projects as mockProjects,
-  services as mockServices,
-  teams as mockTeams,
   activityEvents as mockActivity,
   notifications as mockNotifications,
-  timelineEvents as mockTimeline,
-  comments as mockComments,
   users as mockUsers,
   currentUser as mockCurrentUser,
   currentOrganization as mockOrg,
   organizations as mockOrganizations
 } from './mock-data'
+import { api, ApiError } from './api'
+import {
+  mapComment,
+  mapIncident,
+  mapProject,
+  mapRelatedIncident,
+  mapService,
+  mapTeam,
+  mapTimelineEvent,
+  serializeIncidentFilters
+} from './mappers'
+import type { ApiIncident, ApiIncidentDetail, ApiProject, ApiService, ApiTeam, IncidentSort } from './mappers'
 
 function delay(ms = 200): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+/** A missing record (404) or a malformed id (422) means "not found", not a failure. */
+async function orUndefined<T>(request: Promise<T>): Promise<T | undefined> {
+  try {
+    return await request
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 422)) return undefined
+    throw err
+  }
+}
+
+// The detail page asks for the incident, its timeline and its comments at the same
+// time, and one endpoint returns all three. Share a single in-flight request.
+const detailRequests = new Map<string, Promise<ApiIncidentDetail>>()
+
+function fetchIncidentDetail(id: string): Promise<ApiIncidentDetail> {
+  let request = detailRequests.get(id)
+  if (!request) {
+    request = api.get<ApiIncidentDetail>(`/incidents/${id}`).finally(() => detailRequests.delete(id))
+    detailRequests.set(id, request)
+  }
+  return request
+}
+
 export const incidentRepository = {
-  async list(filters?: Partial<IncidentFilters>, pagination?: Partial<PaginationState>): Promise<{ data: Incident[]; total: number }> {
-    await delay()
-    let result = [...mockIncidents]
-
-    if (filters?.search) {
-      const q = filters.search.toLowerCase()
-      result = result.filter(i =>
-        i.title.toLowerCase().includes(q) ||
-        `INC-${i.number}`.toLowerCase().includes(q)
-      )
-    }
-    if (filters?.severity?.length) {
-      result = result.filter(i => filters.severity!.includes(i.severity))
-    }
-    if (filters?.status?.length) {
-      result = result.filter(i => filters.status!.includes(i.status))
-    }
-    if (filters?.serviceId?.length) {
-      result = result.filter(i => i.serviceIds.some(sid => filters.serviceId!.includes(sid)))
-    }
-    if (filters?.teamId?.length) {
-      result = result.filter(i => filters.teamId!.includes(i.teamId))
-    }
-
-    const total = result.length
-    const page = pagination?.page ?? 1
-    const pageSize = pagination?.pageSize ?? 20
-    const start = (page - 1) * pageSize
-    result = result.slice(start, start + pageSize)
-
-    return { data: result, total }
+  async list(
+    filters?: Partial<IncidentFilters>,
+    pagination?: Partial<PaginationState>,
+    sort?: IncidentSort
+  ): Promise<{ data: Incident[]; total: number }> {
+    const { data, meta } = await api.list<ApiIncident>('/incidents', serializeIncidentFilters(filters, pagination, sort))
+    return { data: data.map(mapIncident), total: meta.total }
   },
 
   async getById(id: string): Promise<Incident | undefined> {
-    await delay()
-    return mockIncidents.find(i => i.id === id)
+    const detail = await orUndefined(fetchIncidentDetail(id))
+    return detail ? mapIncident(detail) : undefined
   },
 
   async getTimeline(incidentId: string): Promise<TimelineEvent[]> {
-    await delay()
-    return mockTimeline.filter(t => t.incidentId === incidentId)
+    const detail = await orUndefined(fetchIncidentDetail(incidentId))
+    return detail ? detail.events.map(mapTimelineEvent) : []
   },
 
   async getComments(incidentId: string): Promise<Comment[]> {
-    await delay()
-    return mockComments.filter(c => c.incidentId === incidentId)
+    const detail = await orUndefined(fetchIncidentDetail(incidentId))
+    return detail ? detail.comments.map(mapComment) : []
   },
 
+  async getRelated(incidentId: string): Promise<ReturnType<typeof mapRelatedIncident>[]> {
+    const detail = await orUndefined(fetchIncidentDetail(incidentId))
+    return detail ? detail.related.map(mapRelatedIncident) : []
+  },
+
+  // Still mock until the write path (Phase 7)
   async create(_data: Partial<Incident>): Promise<Incident> {
     await delay(500)
     return mockIncidents[0]
@@ -90,37 +102,34 @@ export const incidentRepository = {
 
 export const projectRepository = {
   async list(): Promise<Project[]> {
-    await delay()
-    return [...mockProjects]
+    return (await api.get<ApiProject[]>('/projects')).map(mapProject)
   },
 
   async getById(id: string): Promise<Project | undefined> {
-    await delay()
-    return mockProjects.find(p => p.id === id)
+    const project = await orUndefined(api.get<ApiProject>(`/projects/${id}`))
+    return project ? mapProject(project) : undefined
   }
 }
 
 export const serviceRepository = {
   async list(): Promise<Service[]> {
-    await delay()
-    return [...mockServices]
+    return (await api.get<ApiService[]>('/services')).map(mapService)
   },
 
   async getById(id: string): Promise<Service | undefined> {
-    await delay()
-    return mockServices.find(s => s.id === id)
+    const service = await orUndefined(api.get<ApiService>(`/services/${id}`))
+    return service ? mapService(service) : undefined
   }
 }
 
 export const teamRepository = {
   async list(): Promise<Team[]> {
-    await delay()
-    return [...mockTeams]
+    return (await api.get<ApiTeam[]>('/teams')).map(mapTeam)
   },
 
   async getById(id: string): Promise<Team | undefined> {
-    await delay()
-    return mockTeams.find(t => t.id === id)
+    const team = await orUndefined(api.get<ApiTeam>(`/teams/${id}`))
+    return team ? mapTeam(team) : undefined
   }
 }
 

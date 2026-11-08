@@ -5,11 +5,16 @@ import { projectRepository } from '~/services/repository'
 export function useProjects() {
   const projects = ref<Project[]>([])
   const loading = ref(false)
+  const error = ref('')
 
   async function fetch() {
     loading.value = true
+    error.value = ''
     try {
       projects.value = await projectRepository.list()
+    } catch (err) {
+      projects.value = []
+      error.value = err instanceof Error ? err.message : 'Failed to load projects'
     } finally {
       loading.value = false
     }
@@ -24,5 +29,5 @@ export function useProjects() {
     }
   }
 
-  return { projects, loading, fetch, fetchById }
+  return { projects, loading, error, fetch, fetchById }
 }
