@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { useAppStore } from '~/stores/app'
-import { useSessionStore } from '~/stores/session'
 
 const appStore = useAppStore()
-const sessionStore = useSessionStore()
 const route = useRoute()
 
 const navItems = [

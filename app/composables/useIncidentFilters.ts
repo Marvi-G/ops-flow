@@ -1,6 +1,22 @@
 import { computed } from 'vue'
 import type { IncidentFilters, IncidentSeverity, IncidentStatus } from '~/types'
 
+const SEVERITIES: IncidentSeverity[] = ['critical', 'high', 'medium', 'low']
+const STATUSES: IncidentStatus[] = ['investigating', 'identified', 'monitoring', 'resolved', 'postmortem']
+
+type ArrayFilterKey = 'severity' | 'status' | 'serviceId' | 'teamId'
+
+/** Reads a query value that may be a string, a comma-separated string or a repeated param. */
+function parseArrayParam(param: unknown): string[] {
+  if (!param) return []
+  const parts = Array.isArray(param) ? param : String(param).split(',')
+  return parts.filter((part): part is string => typeof part === 'string' && part !== '')
+}
+
+function queryString(param: unknown): string {
+  return typeof param === 'string' ? param : ''
+}
+
 export function useIncidentFilters() {
   const route = useRoute()
   const router = useRouter()
@@ -9,13 +25,14 @@ export function useIncidentFilters() {
     get() {
       const q = route.query
       return {
-        search: (q.search as string) || '',
-        severity: parseArrayParam(q.severity),
-        status: parseArrayParam(q.status),
+        search: queryString(q.search),
+        // Unknown values in the URL are ignored instead of reaching the API
+        severity: parseArrayParam(q.severity).filter((v): v is IncidentSeverity => SEVERITIES.includes(v as IncidentSeverity)),
+        status: parseArrayParam(q.status).filter((v): v is IncidentStatus => STATUSES.includes(v as IncidentStatus)),
         serviceId: parseArrayParam(q.service),
         teamId: parseArrayParam(q.team),
-        dateFrom: (q.dateFrom as string) || '',
-        dateTo: (q.dateTo as string) || ''
+        dateFrom: queryString(q.dateFrom),
+        dateTo: queryString(q.dateTo)
       }
     },
     set(value: IncidentFilters) {
@@ -31,27 +48,19 @@ export function useIncidentFilters() {
     }
   })
 
-  function parseArrayParam(param: string | string[] | undefined | null): string[] {
-    if (!param) return []
-    if (Array.isArray(param)) return param
-    return param.split(',').filter(Boolean)
-  }
-
   function updateFilter<K extends keyof IncidentFilters>(key: K, value: IncidentFilters[K]) {
     const current = { ...filters.value }
     current[key] = value
     filters.value = current
   }
 
-  function toggleArrayFilter(key: 'severity' | 'status' | 'serviceId' | 'teamId', value: string) {
-    const current = { ...filters.value }
-    const arr = current[key]
-    if (arr.includes(value)) {
-      current[key] = arr.filter(v => v !== value) as any
-    } else {
-      current[key] = [...arr, value] as any
-    }
-    filters.value = current
+  function toggleArrayFilter(key: ArrayFilterKey, value: string) {
+    const current = filters.value
+    const selected: string[] = current[key]
+    const next = selected.includes(value)
+      ? selected.filter(v => v !== value)
+      : [...selected, value]
+    filters.value = { ...current, [key]: next } as IncidentFilters
   }
 
   function resetFilters() {
