@@ -4,7 +4,7 @@ export const severityEnum = z.enum(['critical', 'high', 'medium', 'low']);
 export const statusEnum = z.enum(['investigating', 'identified', 'monitoring', 'resolved', 'postmortem']);
 
 export const createIncidentSchema = z.object({
-  title: z.string().min(1).max(255),
+  title: z.string().trim().min(1).max(255),
   description: z.string().optional(),
   severity: severityEnum,
   status: statusEnum.optional().default('investigating'),
@@ -14,7 +14,7 @@ export const createIncidentSchema = z.object({
 });
 
 export const updateIncidentSchema = z.object({
-  title: z.string().min(1).max(255).optional(),
+  title: z.string().trim().min(1).max(255).optional(),
   description: z.string().optional(),
   severity: severityEnum.optional(),
   status: statusEnum.optional(),
@@ -51,7 +51,7 @@ export const incidentIdSchema = z.object({
 });
 
 export const createCommentSchema = z.object({
-  body: z.string().min(1).max(5000),
+  body: z.string().trim().min(1).max(5000),
 });
 
 export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;

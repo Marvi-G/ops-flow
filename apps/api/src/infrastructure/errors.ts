@@ -14,7 +14,8 @@ export class AppError extends Error {
     this.isOperational = isOperational;
     this.code = code;
 
-    Object.setPrototypeOf(this, AppError.prototype);
+    // new.target keeps subclasses (e.g. ValidationError) recognisable with instanceof
+    Object.setPrototypeOf(this, new.target.prototype);
     Error.captureStackTrace(this, this.constructor);
   }
 }

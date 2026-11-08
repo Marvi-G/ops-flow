@@ -30,7 +30,22 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = Omit<FetchOptions, 'baseURL' | 'method' | 'body'> & {
+/**
+ * Field-level messages from a 422 response ({ field: ['message', ...] }),
+ * as { field: 'first message' }. Empty for any other kind of error.
+ */
+export function fieldErrors(err: unknown): Record<string, string> {
+  if (!(err instanceof ApiError) || err.status !== 422) return {}
+  const details = err.details
+  if (!details || typeof details !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(details as Record<string, unknown>)
+      .filter(([, messages]) => Array.isArray(messages) && messages.length > 0)
+      .map(([field, messages]) => [field, String((messages as unknown[])[0])])
+  )
+}
+
+type RequestOptions =Omit<FetchOptions, 'baseURL' | 'method' | 'body'> & {
   body?: Record<string, unknown>
 }
 

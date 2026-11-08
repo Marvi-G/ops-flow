@@ -1,5 +1,5 @@
 import { incidentRepository } from './repository.js';
-import { NotFoundError } from '../../infrastructure/errors.js';
+import { NotFoundError, ValidationError } from '../../infrastructure/errors.js';
 import type { CreateIncidentInput, UpdateIncidentInput, IncidentQueryInput } from './schemas.js';
 
 export class IncidentService {
@@ -17,11 +17,28 @@ export class IncidentService {
     return incident;
   }
 
+  /** Ids sent by the client must point at records of the caller's own organization. */
+  private async assertReferences(
+    organizationId: string,
+    refs: { teamId?: string | null; assigneeId?: string | null; serviceIds?: string[] }
+  ) {
+    const invalid = await incidentRepository.findInvalidReferences(organizationId, refs);
+
+    if (invalid.length > 0) {
+      throw new ValidationError(
+        'Some referenced records do not exist',
+        Object.fromEntries(invalid.map((field) => [field, ['Not found in this organization']]))
+      );
+    }
+  }
+
   async create(organizationId: string, userId: string, input: CreateIncidentInput) {
+    await this.assertReferences(organizationId, input);
     return incidentRepository.create(organizationId, userId, input);
   }
 
   async update(organizationId: string, id: string, userId: string, input: UpdateIncidentInput) {
+    await this.assertReferences(organizationId, input);
     const incident = await incidentRepository.update(organizationId, id, userId, input);
 
     if (!incident) {

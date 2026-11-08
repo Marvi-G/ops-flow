@@ -16,7 +16,6 @@ import type {
 } from '~/types'
 
 import {
-  incidents as mockIncidents,
   activityEvents as mockActivity,
   notifications as mockNotifications
 } from './mock-data'
@@ -45,6 +44,17 @@ import type {
   ApiTeam,
   IncidentSort
 } from './mappers'
+
+/** Body of POST/PATCH /incidents. Optional ids are left out (create) or null (clear). */
+export interface IncidentInput {
+  title: string
+  description?: string
+  severity: Incident['severity']
+  status?: IncidentStatus
+  teamId?: string | null
+  assigneeId?: string | null
+  serviceIds?: string[]
+}
 
 function delay(ms = 200): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -103,10 +113,17 @@ export const incidentRepository = {
     return detail ? detail.related.map(mapRelatedIncident) : []
   },
 
-  // Still mock until the write path (Phase 7)
-  async create(_data: Partial<Incident>): Promise<Incident> {
-    await delay(500)
-    return mockIncidents[0]
+  async create(input: IncidentInput): Promise<Incident> {
+    return mapIncident(await api.post<ApiIncident>('/incidents', { ...input }))
+  },
+
+  /** Partial update. A null teamId/assigneeId clears it. */
+  async update(id: string, patch: Partial<IncidentInput>): Promise<Incident> {
+    return mapIncident(await api.patch<ApiIncident>(`/incidents/${id}`, { ...patch }))
+  },
+
+  async addComment(incidentId: string, body: string): Promise<Comment> {
+    return mapComment(await api.post<Parameters<typeof mapComment>[0]>(`/incidents/${incidentId}/comments`, { body }))
   }
 }
 

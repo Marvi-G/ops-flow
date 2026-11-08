@@ -6,6 +6,7 @@ import { formatDateTime, formatTime, formatRelativeTime } from '~/utils'
 definePageMeta({ layout: 'default' })
 
 const route = useRoute()
+const { can } = usePermissions()
 const incidentId = route.params.id as string
 
 const incident = ref<Incident | null>(null)
@@ -17,6 +18,8 @@ const loadError = ref('')
 const activeTab = ref<'timeline' | 'comments' | 'activity'>('timeline')
 const newComment = ref('')
 const transitioning = ref(false)
+const commenting = ref(false)
+const actionError = ref('')
 
 onMounted(async () => {
   try {
@@ -69,33 +72,47 @@ const previousStatus = computed(() => {
   return found ? found[0] : null
 })
 
+/** Re-reads the timeline, which gets a new entry for every change and comment. */
+async function refreshTimeline() {
+  try {
+    timeline.value = await incidentRepository.getTimeline(incidentId)
+  } catch {
+    // The change itself was saved; a stale timeline is not worth an error banner
+  }
+}
+
 async function transitionTo(status: IncidentStatus) {
   if (!incident.value || transitioning.value) return
   transitioning.value = true
+  actionError.value = ''
 
-  // Add timeline event
-  const newEvent: TimelineEvent = {
-    id: `tl-new-${Date.now()}`,
-    incidentId: incident.value.id,
-    type: 'status_change',
-    title: `Status changed to ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-    userId: 'user-1',
-    user: { id: 'user-1', name: 'Mark Chen', email: 'mark@northstarlabs.io', role: 'admin', organizationId: 'org-1' },
-    createdAt: new Date().toISOString()
+  try {
+    // The page shows what the server saved, not what we assumed it would save
+    incident.value = await incidentRepository.update(incident.value.id, { status })
+    await refreshTimeline()
+  } catch (err) {
+    actionError.value = err instanceof Error ? err.message : 'Failed to update the status'
+  } finally {
+    transitioning.value = false
   }
+}
 
-  // Update incident
-  incident.value.status = status
-  incident.value.updatedAt = new Date().toISOString()
-  if (status === 'resolved') {
-    incident.value.resolvedAt = new Date().toISOString()
+async function submitComment() {
+  const body = newComment.value.trim()
+  if (!body || commenting.value) return
+  commenting.value = true
+  actionError.value = ''
+
+  try {
+    const comment = await incidentRepository.addComment(incidentId, body)
+    incidentComments.value = [comment, ...incidentComments.value]
+    newComment.value = ''
+    await refreshTimeline()
+  } catch (err) {
+    actionError.value = err instanceof Error ? err.message : 'Failed to add the comment'
+  } finally {
+    commenting.value = false
   }
-
-  // Add to timeline
-  timeline.value.push(newEvent)
-
-  await new Promise(r => setTimeout(r, 300))
-  transitioning.value = false
 }
 </script>
 
@@ -138,7 +155,7 @@ async function transitionTo(status: IncidentStatus) {
         </div>
 
         <!-- State transition buttons -->
-        <div v-if="nextStatus || previousStatus" class="mt-4 flex flex-wrap items-center gap-2">
+        <div v-if="can('incidents.update') && (nextStatus || previousStatus)" class="mt-4 flex flex-wrap items-center gap-2">
           <span class="text-[12px] text-neutral-500">Move to:</span>
           <button
             v-if="previousStatus"
@@ -165,6 +182,10 @@ async function transitionTo(status: IncidentStatus) {
           </button>
         </div>
       </div>
+
+      <p v-if="actionError" class="mb-4 rounded-md bg-danger-50 p-3 text-[13px] text-danger-500 dark:bg-danger-50/20">
+        {{ actionError }}
+      </p>
 
       <div class="grid gap-6 lg:grid-cols-3">
         <!-- Main content -->
@@ -254,15 +275,16 @@ async function transitionTo(status: IncidentStatus) {
             </div>
 
             <!-- Add comment -->
-            <div class="mt-4 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-300 dark:bg-neutral-100">
+            <div v-if="can('incidents.update')" class="mt-4 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-300 dark:bg-neutral-100">
               <textarea
                 v-model="newComment"
+                maxlength="5000"
                 rows="3"
                 placeholder="Add a comment..."
                 class="w-full resize-none rounded-md border border-neutral-200 bg-transparent px-3 py-2 text-[13px] text-neutral-900 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-neutral-300 dark:text-neutral-800"
               />
               <div class="mt-2 flex justify-end">
-                <UButton color="primary" size="sm" label="Comment" :disabled="!newComment.trim()" />
+                <UButton color="primary" size="sm" label="Comment" :loading="commenting" :disabled="!newComment.trim()" @click="submitComment" />
               </div>
             </div>
           </div>

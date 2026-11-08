@@ -210,194 +210,158 @@ export class IncidentRepository {
     };
   }
 
+  /**
+   * Returns the names of the fields whose ids don't belong to this organization.
+   * Teams and services must be in the org; an assignee must be a member of it.
+   */
+  async findInvalidReferences(
+    organizationId: string,
+    refs: { teamId?: string | null; assigneeId?: string | null; serviceIds?: string[] }
+  ): Promise<string[]> {
+    const db = getDatabase();
+    const invalid: string[] = [];
+
+    if (refs.teamId) {
+      const team = await db.team.findFirst({ where: { id: refs.teamId, organizationId }, select: { id: true } });
+      if (!team) invalid.push('teamId');
+    }
+
+    if (refs.assigneeId) {
+      const member = await db.organizationMember.findFirst({
+        where: { organizationId, userId: refs.assigneeId },
+        select: { id: true },
+      });
+      if (!member) invalid.push('assigneeId');
+    }
+
+    if (refs.serviceIds?.length) {
+      const unique = [...new Set(refs.serviceIds)];
+      const count = await db.service.count({ where: { organizationId, id: { in: unique } } });
+      if (count !== unique.length) invalid.push('serviceIds');
+    }
+
+    return invalid;
+  }
+
   async create(organizationId: string, userId: string, input: CreateIncidentInput) {
     const db = getDatabase();
+    const serviceIds = input.serviceIds ? [...new Set(input.serviceIds)] : undefined;
 
-    // Get next incident number for this organization
-    const lastIncident = await db.incident.findFirst({
-      where: { organizationId },
-      orderBy: { number: 'desc' },
-      select: { number: true },
-    });
+    // The number is "last + 1" per organization. Two requests at the same moment can pick
+    // the same number; the unique (organizationId, number) index rejects the second, which
+    // then simply retries with the next number.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const incident = await db.$transaction(async (tx) => {
+          const last = await tx.incident.findFirst({
+            where: { organizationId },
+            orderBy: { number: 'desc' },
+            select: { number: true },
+          });
 
-    const number = (lastIncident?.number || 0) + 1;
-
-    const incident = await db.incident.create({
-      data: {
-        organizationId,
-        number,
-        title: input.title,
-        description: input.description,
-        severity: input.severity,
-        status: input.status || 'investigating',
-        teamId: input.teamId,
-        assigneeId: input.assigneeId,
-        createdById: userId,
-        services: input.serviceIds
-          ? {
-              create: input.serviceIds.map((serviceId) => ({
-                serviceId,
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        team: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        services: {
-          include: {
-            service: {
-              select: {
-                id: true,
-                name: true,
-              },
+          const created = await tx.incident.create({
+            data: {
+              organizationId,
+              number: (last?.number ?? 0) + 1,
+              title: input.title,
+              description: input.description,
+              severity: input.severity,
+              status: input.status || 'investigating',
+              resolvedAt: input.status === 'resolved' ? new Date() : undefined,
+              teamId: input.teamId,
+              assigneeId: input.assigneeId,
+              createdById: userId,
+              services: serviceIds ? { create: serviceIds.map((serviceId) => ({ serviceId })) } : undefined,
             },
-          },
-        },
-      },
-    });
+            include: listInclude,
+          });
 
-    // Create initial event
-    await db.incidentEvent.create({
-      data: {
-        incidentId: incident.id,
-        userId,
-        type: 'created',
-        title: 'Incident created',
-      },
-    });
+          await tx.incidentEvent.create({
+            data: { incidentId: created.id, userId, type: 'created', title: 'Incident created' },
+          });
 
-    return {
-      ...incident,
-      services: incident.services.map((is) => is.service),
-    };
+          return created;
+        });
+
+        return { ...incident, services: incident.services.map((is) => is.service) };
+      } catch (error) {
+        const isNumberClash = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+        if (!isNumberClash || attempt === 2) throw error;
+      }
+    }
+
+    throw new Error('Could not allocate an incident number');
   }
 
   async update(organizationId: string, id: string, userId: string, input: UpdateIncidentInput) {
     const db = getDatabase();
+    const serviceIds = input.serviceIds ? [...new Set(input.serviceIds)] : undefined;
 
-    // Get current incident to track changes
-    const current = await db.incident.findFirst({
-      where: { id, organizationId },
+    const result = await db.$transaction(async (tx) => {
+      const current = await tx.incident.findFirst({ where: { id, organizationId } });
+
+      if (!current) {
+        return null;
+      }
+
+      const reopened = input.status !== undefined && input.status !== 'resolved' && current.status === 'resolved';
+      const resolvedNow = input.status === 'resolved' && current.status !== 'resolved';
+
+      const incident = await tx.incident.update({
+        where: { id },
+        data: {
+          title: input.title,
+          description: input.description,
+          severity: input.severity,
+          status: input.status,
+          teamId: input.teamId,
+          assigneeId: input.assigneeId,
+          // Stamp the time when it gets resolved, clear it if it is reopened
+          resolvedAt: resolvedNow ? new Date() : reopened ? null : undefined,
+          services: serviceIds
+            ? { deleteMany: {}, create: serviceIds.map((serviceId) => ({ serviceId })) }
+            : undefined,
+        },
+        include: listInclude,
+      });
+
+      const events: Array<{ type: string; title: string }> = [];
+
+      if (input.status && input.status !== current.status) {
+        events.push({
+          type: 'status_change',
+          title: `Status changed to ${input.status.charAt(0).toUpperCase()}${input.status.slice(1)}`,
+        });
+      }
+
+      if (input.severity && input.severity !== current.severity) {
+        events.push({
+          type: 'severity_change',
+          title: `Severity changed from ${current.severity} to ${input.severity}`,
+        });
+      }
+
+      if (input.assigneeId !== undefined && input.assigneeId !== current.assigneeId) {
+        events.push({
+          type: 'assigned',
+          title: incident.assignee ? `Assigned to ${incident.assignee.name}` : 'Incident unassigned',
+        });
+      }
+
+      if (events.length > 0) {
+        await tx.incidentEvent.createMany({
+          data: events.map((event) => ({ incidentId: id, userId, type: event.type, title: event.title })),
+        });
+      }
+
+      return incident;
     });
 
-    if (!current) {
+    if (!result) {
       return null;
     }
 
-    const incident = await db.incident.update({
-      where: { id },
-      data: {
-        title: input.title,
-        description: input.description,
-        severity: input.severity,
-        status: input.status,
-        teamId: input.teamId,
-        assigneeId: input.assigneeId,
-        resolvedAt: input.status === 'resolved' && current.status !== 'resolved'
-          ? new Date()
-          : undefined,
-        services: input.serviceIds
-          ? {
-              deleteMany: {},
-              create: input.serviceIds.map((serviceId) => ({
-                serviceId,
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        team: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        services: {
-          include: {
-            service: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Create events for changes
-    const events: Array<{ type: string; title: string; description?: string }> = [];
-
-    if (input.status && input.status !== current.status) {
-      events.push({
-        type: 'status_change',
-        title: `Status changed to ${input.status}`,
-      });
-    }
-
-    if (input.severity && input.severity !== current.severity) {
-      events.push({
-        type: 'severity_change',
-        title: `Severity changed from ${current.severity} to ${input.severity}`,
-      });
-    }
-
-    if (input.assigneeId && input.assigneeId !== current.assigneeId) {
-      events.push({
-        type: 'assigned',
-        title: 'Incident assigned',
-      });
-    }
-
-    for (const event of events) {
-      await db.incidentEvent.create({
-        data: {
-          incidentId: id,
-          userId,
-          type: event.type,
-          title: event.title,
-          description: event.description,
-        },
-      });
-    }
-
-    return {
-      ...incident,
-      services: incident.services.map((is) => is.service),
-    };
+    return { ...result, services: result.services.map((is) => is.service) };
   }
 
   async addComment(organizationId: string, incidentId: string, userId: string, body: string) {

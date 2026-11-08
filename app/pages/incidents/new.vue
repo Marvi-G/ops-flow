@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { projectRepository, serviceRepository, teamRepository, userRepository } from '~/services/repository'
-import type { Project, Service, Team, User } from '~/types'
+import { incidentRepository, projectRepository, serviceRepository, teamRepository, userRepository } from '~/services/repository'
+import { fieldErrors } from '~/services/api'
+import type { IncidentSeverity, Project, Service, Team, User } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const router = useRouter()
+const { can } = usePermissions()
 
 // Options for the dropdowns
 const teams = ref<Team[]>([])
@@ -35,7 +37,7 @@ onMounted(async () => {
 const form = reactive({
   title: '',
   description: '',
-  severity: '' as string,
+  severity: '' as IncidentSeverity | '',
   projectId: '',
   serviceId: '',
   teamId: '',
@@ -50,6 +52,25 @@ const dirty = ref(false)
 const showUnsavedDialog = ref(false)
 
 watch(form, () => { dirty.value = true }, { deep: true })
+
+// An error goes away as soon as its field is edited, not only on the next submit
+for (const field of ['title', 'description', 'severity', 'teamId'] as const) {
+  watch(() => form[field], () => {
+    if (errors.value[field]) {
+      const { [field]: _cleared, ...rest } = errors.value
+      errors.value = rest
+    }
+  })
+}
+
+// An incident belongs to a project through its services, so the project only narrows the list
+const serviceOptions = computed(() =>
+  form.projectId ? services.value.filter(s => s.projectId === form.projectId) : services.value
+)
+
+watch(() => form.projectId, () => {
+  if (form.serviceId && !serviceOptions.value.some(s => s.id === form.serviceId)) form.serviceId = ''
+})
 
 // Unsaved changes warning
 function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -97,29 +118,35 @@ function validate(): boolean {
 }
 
 async function handleSubmit() {
-  if (!validate()) return
+  if (submitting.value || !validate()) return
   submitting.value = true
   submitError.value = ''
 
   try {
-    await new Promise(r => setTimeout(r, 800))
-    // Simulate occasional error for demo
-    if (Math.random() < 0.1) {
-      throw new Error('Network error. Please try again.')
-    }
+    const incident = await incidentRepository.create({
+      title: form.title.trim(),
+      description: form.description.trim(),
+      severity: form.severity as IncidentSeverity,
+      teamId: form.teamId,
+      assigneeId: form.assigneeId || undefined,
+      serviceIds: form.serviceId ? [form.serviceId] : undefined
+    })
     submitted.value = true
     dirty.value = false
     setTimeout(() => {
-      router.push('/incidents')
-    }, 1500)
+      router.push(`/incidents/${incident.id}`)
+    }, 1000)
   } catch (err) {
+    // Messages the API attached to specific fields show next to those fields
+    const fields = fieldErrors(err)
+    if (Object.keys(fields).length > 0) errors.value = fields
     submitError.value = err instanceof Error ? err.message : 'Failed to create incident. Please try again.'
   } finally {
     submitting.value = false
   }
 }
 
-const severityOptions = [
+const severityOptions: { label: string, value: IncidentSeverity }[] = [
   { label: 'Critical', value: 'critical' },
   { label: 'High', value: 'high' },
   { label: 'Medium', value: 'medium' },
@@ -135,12 +162,15 @@ const severityOptions = [
     <div v-if="submitted" class="rounded-lg border border-success-500/20 bg-success-50 p-6 text-center dark:bg-success-50/10">
       <UIcon name="i-lucide-check-circle" class="mx-auto mb-3 h-8 w-8 text-success-500" />
       <h3 class="text-[14px] font-semibold text-neutral-900 dark:text-neutral-800">Incident created</h3>
-      <p class="mt-1 text-[13px] text-neutral-500">Redirecting to incidents list...</p>
+      <p class="mt-1 text-[13px] text-neutral-500">Opening the incident...</p>
     </div>
 
     <!-- Form -->
     <form v-else class="space-y-5" @submit.prevent="handleSubmit">
       <p v-if="optionsError" class="text-[12px] text-warning-500">{{ optionsError }}</p>
+      <p v-if="!can('incidents.create')" class="rounded-md bg-warning-50 p-3 text-[13px] text-warning-500 dark:bg-warning-50/20">
+        Your role is read-only, so you can't create incidents.
+      </p>
 
       <!-- Error state -->
       <div v-if="submitError" class="rounded-lg border border-danger-500/20 bg-danger-50 p-4 dark:bg-danger-50/10">
@@ -244,7 +274,7 @@ const severityOptions = [
                 class="h-9 w-full rounded-md border border-neutral-200 bg-transparent px-3 text-[13px] text-neutral-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-neutral-300 dark:text-neutral-800"
               >
                 <option value="">Select service</option>
-                <option v-for="svc in services" :key="svc.id" :value="svc.id">{{ svc.name }}</option>
+                <option v-for="svc in serviceOptions" :key="svc.id" :value="svc.id">{{ svc.name }}</option>
               </select>
             </div>
 
@@ -298,12 +328,20 @@ const severityOptions = [
           size="sm"
           label="Create incident"
           :loading="submitting"
+          :disabled="!can('incidents.create')"
         />
       </div>
     </form>
 
     <!-- Unsaved changes dialog -->
-    <UModal v-model:open="showUnsavedDialog" :ui="{ content: 'rounded-xl' }">
+    <UModal
+      v-model:open="showUnsavedDialog"
+      title="Unsaved changes"
+      description="You have unsaved changes. Are you sure you want to leave?"
+      :ui="{ content: 'rounded-xl' }"
+    >
+      <!-- The default slot is the modal's trigger; the body goes in #content -->
+      <template #content>
       <div class="p-6">
         <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-50 dark:bg-warning-50/20">
           <UIcon name="i-lucide-alert-triangle" class="h-5 w-5 text-warning-500" />
@@ -325,6 +363,7 @@ const severityOptions = [
           </button>
         </div>
       </div>
+      </template>
     </UModal>
   </div>
 </template>

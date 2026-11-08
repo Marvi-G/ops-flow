@@ -278,6 +278,112 @@ describe('Incidents', () => {
   });
 });
 
+describe('Incident write path', () => {
+  let cookie: string;
+  let viewerCookie: string;
+  let incidentId: string;
+  let teamId: string;
+  let serviceId: string;
+  let assigneeId: string;
+
+  const login = async (email: string, password: string) => {
+    const res = await request(app).post('/api/auth/login').send({ email, password });
+    return res.headers['set-cookie'][0] as string;
+  };
+
+  beforeAll(async () => {
+    cookie = await login('admin@northstarlabs.io', 'admin');
+    viewerCookie = await login('david@northstarlabs.io', 'password123');
+
+    const teams = await request(app).get('/api/teams').set('Cookie', cookie);
+    const services = await request(app).get('/api/services').set('Cookie', cookie);
+    const users = await request(app).get('/api/users').set('Cookie', cookie);
+    teamId = teams.body.data[0].id;
+    serviceId = services.body.data[0].id;
+    assigneeId = users.body.data[0].id;
+  });
+
+  it('creates an incident with a team, service and assignee, and logs "created"', async () => {
+    const res = await request(app)
+      .post('/api/incidents')
+      .set('Cookie', cookie)
+      .send({ title: '  Write path test  ', severity: 'high', teamId, assigneeId, serviceIds: [serviceId, serviceId] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.title).toBe('Write path test');
+    expect(res.body.data.team.id).toBe(teamId);
+    expect(res.body.data.assignee.id).toBe(assigneeId);
+    expect(res.body.data.services).toHaveLength(1);
+    incidentId = res.body.data.id;
+
+    const detail = await request(app).get(`/api/incidents/${incidentId}`).set('Cookie', cookie);
+    expect(detail.body.data.events.map((e: any) => e.type)).toEqual(['created']);
+  });
+
+  it('gives two incidents created at once different numbers', async () => {
+    const body = { title: 'Concurrent', severity: 'low' };
+    const [a, b] = await Promise.all([
+      request(app).post('/api/incidents').set('Cookie', cookie).send(body),
+      request(app).post('/api/incidents').set('Cookie', cookie).send(body),
+    ]);
+
+    expect(a.status).toBe(201);
+    expect(b.status).toBe(201);
+    expect(a.body.data.number).not.toBe(b.body.data.number);
+  });
+
+  it('rejects a team, assignee or service that is not in the organization', async () => {
+    const unknown = '11111111-1111-4111-8111-111111111111';
+    const res = await request(app)
+      .post('/api/incidents')
+      .set('Cookie', cookie)
+      .send({ title: 'Bad refs', severity: 'low', teamId: unknown, assigneeId: unknown, serviceIds: [unknown] });
+
+    expect(res.status).toBe(422);
+    expect(Object.keys(res.body.error.details).sort()).toEqual(['assigneeId', 'serviceIds', 'teamId']);
+
+    const patch = await request(app).patch(`/api/incidents/${incidentId}`).set('Cookie', cookie).send({ teamId: unknown });
+    expect(patch.status).toBe(422);
+  });
+
+  it('records status, severity and assignment changes on the timeline', async () => {
+    await request(app).patch(`/api/incidents/${incidentId}`).set('Cookie', cookie).send({ status: 'identified', severity: 'critical', assigneeId: null });
+
+    const detail = await request(app).get(`/api/incidents/${incidentId}`).set('Cookie', cookie);
+    const titles = detail.body.data.events.map((e: any) => e.title);
+
+    expect(detail.body.data.assigneeId).toBeNull();
+    expect(titles).toContain('Status changed to Identified');
+    expect(titles).toContain('Severity changed from high to critical');
+    expect(titles).toContain('Incident unassigned');
+  });
+
+  it('sets resolvedAt when resolved and clears it when reopened', async () => {
+    const resolved = await request(app).patch(`/api/incidents/${incidentId}`).set('Cookie', cookie).send({ status: 'resolved' });
+    expect(resolved.body.data.resolvedAt).not.toBeNull();
+
+    const reopened = await request(app).patch(`/api/incidents/${incidentId}`).set('Cookie', cookie).send({ status: 'monitoring' });
+    expect(reopened.body.data.resolvedAt).toBeNull();
+  });
+
+  it('returns a new comment first in the incident, with its author', async () => {
+    await request(app).post(`/api/incidents/${incidentId}/comments`).set('Cookie', cookie).send({ body: '  first  ' });
+    await request(app).post(`/api/incidents/${incidentId}/comments`).set('Cookie', cookie).send({ body: 'second' });
+
+    const detail = await request(app).get(`/api/incidents/${incidentId}`).set('Cookie', cookie);
+    expect(detail.body.data.comments.map((c: any) => c.body)).toEqual(['second', 'first']);
+    expect(detail.body.data.comments[0].user.name).toBeDefined();
+  });
+
+  it('does not let a viewer create, update or comment', async () => {
+    const create = await request(app).post('/api/incidents').set('Cookie', viewerCookie).send({ title: 'x', severity: 'low' });
+    const update = await request(app).patch(`/api/incidents/${incidentId}`).set('Cookie', viewerCookie).send({ status: 'resolved' });
+    const comment = await request(app).post(`/api/incidents/${incidentId}/comments`).set('Cookie', viewerCookie).send({ body: 'x' });
+
+    expect([create.status, update.status, comment.status]).toEqual([403, 403, 403]);
+  });
+});
+
 describe('Tenant Isolation', () => {
   let user1Cookie: string;
   let user2Cookie: string;
