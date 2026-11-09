@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useProjects } from '~/composables/useProjects'
-import { incidentRepository, serviceRepository } from '~/services/repository'
+import { incidentRepository, projectRepository, serviceRepository } from '~/services/repository'
 import { formatRelativeTime } from '~/utils'
 import type { Incident, Project, Service } from '~/types'
 
@@ -15,6 +15,32 @@ const projectIncidents = ref<Incident[]>([])
 const loaded = ref(false)
 const loadError = ref('')
 const activeTab = ref('overview')
+const { can } = usePermissions()
+
+const showEdit = ref(false)
+const showDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
+
+function onSaved(updated: Project) {
+  project.value = updated
+}
+
+async function confirmDelete() {
+  if (deleting.value) return
+  deleting.value = true
+  deleteError.value = ''
+  try {
+    await projectRepository.delete(projectId)
+    showDelete.value = false
+    await navigateTo('/projects')
+  } catch (err) {
+    // Typically "still has services": the dialog stays open and explains why
+    deleteError.value = err instanceof Error ? err.message : 'Failed to delete the project'
+  } finally {
+    deleting.value = false
+  }
+}
 
 onMounted(async () => {
   try {
@@ -59,17 +85,30 @@ const tabs = ['overview', 'services', 'incidents', 'activity']
     <div v-else>
       <SharedPageHeader :title="project.name" :description="project.description">
         <template #actions>
-          <UButton color="primary" size="sm" icon="i-lucide-settings" label="Settings" variant="ghost" />
+          <UButton v-if="can('projects.update')" color="neutral" size="sm" icon="i-lucide-pencil" label="Edit" variant="outline" @click="showEdit = true" />
+          <UButton v-if="can('projects.delete')" color="error" size="sm" icon="i-lucide-trash-2" label="Delete" variant="ghost" @click="deleteError = ''; showDelete = true" />
         </template>
       </SharedPageHeader>
 
+      <ProjectsFormModal v-model:open="showEdit" :project="project" @saved="onSaved" />
+      <SharedConfirmDialog
+        v-model:open="showDelete"
+        title="Delete this project?"
+        :description="`${project.name} will be removed permanently. This can't be undone.`"
+        confirm-label="Delete project"
+        danger
+        :loading="deleting"
+        :error="deleteError"
+        @confirm="confirmDelete"
+      />
+
       <!-- Tabs -->
-      <div class="mb-6 flex gap-1 border-b border-neutral-200 dark:border-neutral-300">
+      <div class="mb-6 flex gap-1 overflow-x-auto border-b border-neutral-200 dark:border-neutral-300">
         <button
           v-for="tab in tabs"
           :key="tab"
           :class="[
-            'border-b-2 px-3 py-2 text-[13px] font-medium capitalize transition-colors',
+            'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-medium capitalize transition-colors',
             activeTab === tab
               ? 'border-primary-500 text-primary-600 dark:border-primary-400 dark:text-primary-400'
               : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-600'
@@ -139,16 +178,16 @@ const tabs = ['overview', 'services', 'incidents', 'activity']
             v-for="svc in projectServices"
             :key="svc.id"
             :to="`/services/${svc.id}`"
-            class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
+            class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
           >
-            <div class="flex items-center gap-3">
+            <div class="flex min-w-0 items-center gap-3">
               <SharedServiceStatusBadge :status="svc.status" />
-              <div>
-                <p class="text-[13px] font-medium text-neutral-900 dark:text-neutral-800">{{ svc.name }}</p>
-                <p class="text-[12px] text-neutral-500">{{ svc.description }}</p>
+              <div class="min-w-0">
+                <p class="truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-800">{{ svc.name }}</p>
+                <p class="truncate text-[12px] text-neutral-500">{{ svc.description }}</p>
               </div>
             </div>
-            <div class="text-right">
+            <div class="shrink-0 text-right">
               <p class="text-[13px] text-neutral-700 dark:text-neutral-600">{{ svc.latency }}ms</p>
               <p class="text-[12px] text-neutral-400">{{ svc.uptime }}% uptime</p>
             </div>
@@ -162,17 +201,7 @@ const tabs = ['overview', 'services', 'incidents', 'activity']
           No incidents for this project
         </div>
         <div v-else class="divide-y divide-neutral-200 dark:divide-neutral-300">
-          <NuxtLink
-            v-for="inc in projectIncidents"
-            :key="inc.id"
-            :to="`/incidents/${inc.id}`"
-            class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
-          >
-            <SharedSeverityBadge :severity="inc.severity" />
-            <span class="flex-1 text-[13px] font-medium text-neutral-900 dark:text-neutral-800">INC-{{ inc.number }} {{ inc.title }}</span>
-            <IncidentsIncidentStatusBadge :status="inc.status" />
-            <span class="text-[12px] text-neutral-400">{{ formatRelativeTime(inc.createdAt) }}</span>
-          </NuxtLink>
+          <IncidentsIncidentRow v-for="inc in projectIncidents" :key="inc.id" :incident="inc" show-time />
         </div>
       </div>
 

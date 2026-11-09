@@ -30,7 +30,7 @@ const typeIcons: Record<string, string> = {
     </button>
 
     <template #content>
-      <div class="w-80">
+      <div class="w-[min(20rem,calc(100vw-2rem))]">
         <div class="flex items-center justify-between border-b border-neutral-200 px-3 py-2.5 dark:border-neutral-300">
           <h3 class="text-[13px] font-semibold text-neutral-900 dark:text-neutral-800">Notifications</h3>
           <button

@@ -99,7 +99,7 @@ onMounted(() => fetchActivity())
             </p>
             <p class="mt-0.5 text-[12px] text-neutral-400">{{ formatRelativeTime(event.createdAt) }}</p>
           </div>
-          <span class="shrink-0 rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-medium capitalize text-neutral-500 dark:bg-neutral-200 dark:text-neutral-500">
+          <span class="hidden shrink-0 rounded-md bg-neutral-100 px-2 py-0.5 sm:inline text-[11px] font-medium capitalize text-neutral-500 dark:bg-neutral-200 dark:text-neutral-500">
             {{ event.resourceType }}
           </span>
         </div>

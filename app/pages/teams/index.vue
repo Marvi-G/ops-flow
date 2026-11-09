@@ -73,7 +73,7 @@ onMounted(() => fetchTeams())
         </div>
         <p class="mb-3 text-[12px] text-neutral-500">{{ team.description }}</p>
 
-        <div class="flex items-center gap-4 text-[12px] text-neutral-500">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-neutral-500">
           <span class="flex items-center gap-1">
             <UIcon name="i-lucide-users" class="h-3 w-3" />
             {{ team.memberCount }} members

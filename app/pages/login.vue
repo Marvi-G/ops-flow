@@ -40,7 +40,7 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-50">
+  <div class="flex min-h-dvh items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-50">
     <div class="w-full max-w-sm">
       <!-- Logo -->
       <div class="mb-8 text-center">

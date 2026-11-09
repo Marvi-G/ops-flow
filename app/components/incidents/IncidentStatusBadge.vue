@@ -17,7 +17,7 @@ const current = computed(() => config[props.status])
 </script>
 
 <template>
-  <span :class="['inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium', current.class]">
+  <span :class="['inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium', current.class]">
     {{ current.label }}
   </span>
 </template>

@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { useProjects } from '~/composables/useProjects'
 import { formatRelativeTime } from '~/utils'
+import type { Project } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const { projects, loading, error, fetch: fetchProjects } = useProjects()
 const search = ref('')
+const { can } = usePermissions()
+const showForm = ref(false)
+
+function onCreated(project: Project) {
+  navigateTo(`/projects/${project.id}`)
+}
 
 const filteredProjects = computed(() => {
   if (!search.value) return projects.value
@@ -23,9 +30,11 @@ onMounted(() => fetchProjects())
   <div>
     <SharedPageHeader title="Projects" description="Manage your organization's projects">
       <template #actions>
-        <UButton color="primary" size="sm" icon="i-lucide-plus" label="New project" />
+        <UButton v-if="can('projects.create')" color="primary" size="sm" icon="i-lucide-plus" label="New project" @click="showForm = true" />
       </template>
     </SharedPageHeader>
+
+    <ProjectsFormModal v-model:open="showForm" @saved="onCreated" />
 
     <!-- Search -->
     <div class="mb-4">
@@ -78,7 +87,7 @@ onMounted(() => fetchProjects())
           </span>
         </div>
 
-        <div class="flex items-center gap-4 text-[12px] text-neutral-500">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-neutral-500">
           <span class="flex items-center gap-1">
             <UIcon name="i-lucide-server" class="h-3 w-3" />
             {{ project.serviceCount }} services

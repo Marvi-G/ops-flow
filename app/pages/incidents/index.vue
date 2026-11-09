@@ -191,8 +191,8 @@ const activeFilterCount = computed(() => {
 
     <!-- Controls -->
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex flex-1 items-center gap-2">
-        <div class="relative max-w-xs flex-1">
+      <div class="flex flex-1 flex-wrap items-center gap-2">
+        <div class="relative min-w-[10rem] max-w-xs flex-1">
           <UIcon name="i-lucide-search" class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
           <input
             :value="filters.search"
@@ -218,7 +218,7 @@ const activeFilterCount = computed(() => {
           </span>
         </button>
         <UPopover v-model:open="showColumnMenu">
-          <button class="flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 text-[13px] text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-300 dark:text-neutral-500 dark:hover:bg-neutral-200">
+          <button class="hidden h-8 items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 md:flex text-[13px] text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-300 dark:text-neutral-500 dark:hover:bg-neutral-200">
             <UIcon name="i-lucide-columns" class="h-3.5 w-3.5" />
             Columns
           </button>
@@ -245,7 +245,7 @@ const activeFilterCount = computed(() => {
       <div class="flex items-center gap-2">
         <select
           :value="sortValue"
-          class="h-8 rounded-md border border-neutral-200 bg-white px-2.5 text-[13px] text-neutral-700 focus:border-primary-500 focus:outline-none dark:border-neutral-300 dark:bg-neutral-100 dark:text-neutral-600"
+          class="h-8 w-full rounded-md border border-neutral-200 bg-white px-2.5 text-[13px] text-neutral-700 focus:border-primary-500 sm:w-auto focus:outline-none dark:border-neutral-300 dark:bg-neutral-100 dark:text-neutral-600"
           @change="sortValue = ($event.target as HTMLSelectElement).value"
         >
           <option v-for="opt in sortOptions" :key="`${opt.field}-${opt.dir}`" :value="`${opt.field}-${opt.dir}`">{{ opt.label }}</option>
@@ -344,7 +344,7 @@ const activeFilterCount = computed(() => {
     </div>
 
     <!-- Bulk actions bar -->
-    <div v-if="selectedCount > 0" class="mb-4 flex items-center gap-3 rounded-lg border border-primary-500/20 bg-primary-50 px-4 py-2.5 dark:border-primary-400/20 dark:bg-primary-50/10">
+    <div v-if="selectedCount > 0" class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-primary-500/20 bg-primary-50 px-4 py-2.5 dark:border-primary-400/20 dark:bg-primary-50/10">
       <span class="text-[13px] font-medium text-primary-600 dark:text-primary-400">
         {{ selectedCount }} selected
       </span>
@@ -399,7 +399,19 @@ const activeFilterCount = computed(() => {
       </SharedEmptyState>
     </div>
 
-    <div v-else class="overflow-x-auto rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+    <div v-else class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+      <!-- Phones: one card per incident instead of a wide table -->
+      <div class="divide-y divide-neutral-200 md:hidden dark:divide-neutral-300">
+        <IncidentsIncidentRow
+          v-for="incident in incidents"
+          :key="incident.id"
+          :incident="incident"
+          show-time
+          :subtitle="[incident.services?.[0]?.name, incident.team?.name].filter(Boolean).join(' · ')"
+        />
+      </div>
+
+      <div class="hidden overflow-x-auto md:block">
       <table class="w-full">
         <thead>
           <tr class="border-b border-neutral-200 dark:border-neutral-300">
@@ -471,9 +483,10 @@ const activeFilterCount = computed(() => {
           </tr>
         </tbody>
       </table>
+      </div>
 
       <!-- Pagination -->
-      <div class="flex items-center justify-between border-t border-neutral-200 px-4 py-3 dark:border-neutral-300">
+      <div class="flex flex-col items-center gap-2 border-t border-neutral-200 px-4 py-3 sm:flex-row sm:justify-between dark:border-neutral-300">
         <p class="text-[12px] text-neutral-500">
           Showing {{ incidents.length }} of {{ total }} incidents
         </p>
@@ -490,7 +503,7 @@ const activeFilterCount = computed(() => {
           </span>
           <button
             class="rounded-md px-2.5 py-1 text-[12px] font-medium text-neutral-500 hover:bg-neutral-100 disabled:opacity-50 dark:text-neutral-500 dark:hover:bg-neutral-200"
-            :disabled="incidents.length < pageSize"
+            :disabled="page * pageSize >= total"
             @click="page++"
           >
             Next

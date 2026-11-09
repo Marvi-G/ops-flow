@@ -13,7 +13,7 @@
               { name: 'Production', prefix: 'ofk_prod_...a8f2', lastUsed: '2 hours ago' },
               { name: 'Staging', prefix: 'ofk_stg_...b3c1', lastUsed: '1 day ago' },
               { name: 'CI/CD Pipeline', prefix: 'ofk_prod_...d7e4', lastUsed: '3 hours ago' }
-            ]" :key="key.name" class="flex items-center justify-between px-4 py-3">
+            ]" :key="key.name" class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
               <div>
                 <p class="text-[13px] font-medium text-neutral-900 dark:text-neutral-800">{{ key.name }}</p>
                 <p class="text-[12px] font-mono text-neutral-500">{{ key.prefix }}</p>

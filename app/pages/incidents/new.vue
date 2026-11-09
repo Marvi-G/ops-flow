@@ -232,7 +232,7 @@ const severityOptions: { label: string, value: IncidentSeverity }[] = [
             <label class="mb-1.5 block text-[13px] font-medium text-neutral-700 dark:text-neutral-600">
               Severity <span class="text-danger-500">*</span>
             </label>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <button
                 v-for="opt in severityOptions"
                 :key="opt.value"

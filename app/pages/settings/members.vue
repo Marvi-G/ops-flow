@@ -40,20 +40,20 @@ onMounted(async () => {
           <div
             v-for="user in users"
             :key="user.id"
-            class="flex items-center justify-between px-4 py-3"
+            class="flex items-center justify-between gap-3 px-4 py-3"
           >
-            <div class="flex items-center gap-3">
-              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-300 dark:text-neutral-500">
+            <div class="flex min-w-0 items-center gap-3">
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-300 dark:text-neutral-500">
                 {{ user.name.split(' ').map(n => n[0]).join('') }}
               </div>
-              <div>
-                <p class="text-[13px] font-medium text-neutral-900 dark:text-neutral-800">{{ user.name }}</p>
-                <p class="text-[12px] text-neutral-500">{{ user.email }}</p>
+              <div class="min-w-0">
+                <p class="truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-800">{{ user.name }}</p>
+                <p class="truncate text-[12px] text-neutral-500">{{ user.email }}</p>
               </div>
             </div>
             <span
               :class="[
-                'rounded-md px-2 py-0.5 text-[11px] font-medium capitalize',
+                'shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium capitalize',
                 user.role === 'owner' ? 'bg-primary-50 text-primary-600 dark:bg-primary-50 dark:text-primary-400' :
                 user.role === 'admin' ? 'bg-info-50 text-info-500 dark:bg-info-50/20 dark:text-info-700' :
                 'bg-neutral-100 text-neutral-500 dark:bg-neutral-200 dark:text-neutral-500'

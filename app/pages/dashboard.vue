@@ -159,23 +159,12 @@ function getGreeting(): string {
             </NuxtLink>
           </div>
           <div class="divide-y divide-neutral-200 dark:divide-neutral-300">
-            <NuxtLink
+            <IncidentsIncidentRow
               v-for="incident in activeIncidents"
               :key="incident.id"
-              :to="`/incidents/${incident.id}`"
-              class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
-            >
-              <SharedSeverityBadge :severity="incident.severity" />
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-800">
-                  INC-{{ incident.number }} {{ incident.title }}
-                </p>
-                <p class="mt-0.5 text-[12px] text-neutral-500">
-                  {{ incident.team?.name }} &middot; {{ formatRelativeTime(incident.createdAt) }}
-                </p>
-              </div>
-              <IncidentsIncidentStatusBadge :status="incident.status" />
-            </NuxtLink>
+              :incident="incident"
+              :subtitle="`${incident.team?.name ?? ''} · ${formatRelativeTime(incident.createdAt)}`"
+            />
             <div v-if="activeIncidents.length === 0" class="px-4 py-8 text-center text-[13px] text-neutral-400">
               No active incidents
             </div>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useTeams } from '~/composables/useTeams'
 import { incidentRepository, projectRepository } from '~/services/repository'
-import { formatRelativeTime } from '~/utils'
 import type { Incident, Project, Team } from '~/types'
 
 definePageMeta({ layout: 'default' })
@@ -57,12 +56,12 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
       <SharedPageHeader :title="team.name" :description="team.description" />
 
       <!-- Tabs -->
-      <div class="mb-6 flex gap-1 border-b border-neutral-200 dark:border-neutral-300">
+      <div class="mb-6 flex gap-1 overflow-x-auto border-b border-neutral-200 dark:border-neutral-300">
         <button
           v-for="tab in tabs"
           :key="tab"
           :class="[
-            'border-b-2 px-3 py-2 text-[13px] font-medium capitalize transition-colors',
+            'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-medium capitalize transition-colors',
             activeTab === tab
               ? 'border-primary-500 text-primary-600 dark:border-primary-400 dark:text-primary-400'
               : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-600'
@@ -82,21 +81,21 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
           <div
             v-for="member in team.members"
             :key="member.id"
-            class="flex items-center justify-between px-4 py-3"
+            class="flex items-center justify-between gap-3 px-4 py-3"
           >
-            <div class="flex items-center gap-3">
-              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-300 dark:text-neutral-500">
+            <div class="flex min-w-0 items-center gap-3">
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-300 dark:text-neutral-500">
                 {{ member.user.name.split(' ').map(n => n[0]).join('') }}
               </div>
-              <div>
-                <p class="text-[13px] font-medium text-neutral-900 dark:text-neutral-800">{{ member.user.name }}</p>
-                <p class="text-[12px] text-neutral-500">{{ member.user.email }}</p>
+              <div class="min-w-0">
+                <p class="truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-800">{{ member.user.name }}</p>
+                <p class="truncate text-[12px] text-neutral-500">{{ member.user.email }}</p>
               </div>
             </div>
             <div class="flex items-center gap-2">
               <span
                 :class="[
-                  'rounded-md px-2 py-0.5 text-[11px] font-medium',
+                  'shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium',
                   member.role === 'lead'
                     ? 'bg-primary-50 text-primary-600 dark:bg-primary-50 dark:text-primary-400'
                     : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-200 dark:text-neutral-500'
@@ -132,17 +131,7 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
           No incidents for this team
         </div>
         <div v-else class="divide-y divide-neutral-200 dark:divide-neutral-300">
-          <NuxtLink
-            v-for="inc in teamIncidents"
-            :key="inc.id"
-            :to="`/incidents/${inc.id}`"
-            class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
-          >
-            <SharedSeverityBadge :severity="inc.severity" />
-            <span class="flex-1 text-[13px] font-medium text-neutral-900 dark:text-neutral-800">INC-{{ inc.number }} {{ inc.title }}</span>
-            <IncidentsIncidentStatusBadge :status="inc.status" />
-            <span class="text-[12px] text-neutral-400">{{ formatRelativeTime(inc.createdAt) }}</span>
-          </NuxtLink>
+          <IncidentsIncidentRow v-for="inc in teamIncidents" :key="inc.id" :incident="inc" show-time />
         </div>
       </div>
 

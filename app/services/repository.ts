@@ -56,6 +56,14 @@ export interface IncidentInput {
   serviceIds?: string[]
 }
 
+/** Body of POST/PATCH /projects. */
+export interface ProjectInput {
+  name: string
+  description?: string
+  status?: Project['status']
+  teamId?: string | null
+}
+
 function delay(ms = 200): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -135,6 +143,20 @@ export const projectRepository = {
   async getById(id: string): Promise<Project | undefined> {
     const project = await orUndefined(api.get<ApiProject>(`/projects/${id}`))
     return project ? mapProject(project) : undefined
+  },
+
+  async create(input: ProjectInput): Promise<Project> {
+    return mapProject(await api.post<ApiProject>('/projects', { ...input }))
+  },
+
+  /** Partial update. A null teamId removes the team. */
+  async update(id: string, patch: Partial<ProjectInput>): Promise<Project> {
+    return mapProject(await api.patch<ApiProject>(`/projects/${id}`, { ...patch }))
+  },
+
+  /** Refused (409) while the project still has services. */
+  async delete(id: string): Promise<void> {
+    await api.delete(`/projects/${id}`)
   }
 }
 

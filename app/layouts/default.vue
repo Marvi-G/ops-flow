@@ -5,7 +5,7 @@ const appStore = useAppStore()
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-50">
+  <div class="flex h-dvh overflow-hidden bg-neutral-50 dark:bg-neutral-50">
     <!-- Mobile overlay -->
     <div
       v-if="appStore.sidebarMobileOpen"

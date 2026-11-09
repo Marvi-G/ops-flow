@@ -26,7 +26,7 @@ async function selectOrg(orgId: string) {
     </button>
 
     <template #content>
-      <div class="w-64 p-1.5">
+      <div class="w-[min(16rem,calc(100vw-2rem))] p-1.5">
         <p class="px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
           Organizations
         </p>

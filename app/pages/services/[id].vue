@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useServices } from '~/composables/useServices'
 import { incidentRepository } from '~/services/repository'
-import { formatRelativeTime, formatDateTime } from '~/utils'
+import { formatDateTime } from '~/utils'
 import type { Incident, Service } from '~/types'
 
 definePageMeta({ layout: 'default' })
@@ -89,17 +89,7 @@ const uptimeData = Array.from({ length: 30 }, (_, i) => ({
               No incidents for this service
             </div>
             <div v-else class="divide-y divide-neutral-200 dark:divide-neutral-300">
-              <NuxtLink
-                v-for="inc in serviceIncidents"
-                :key="inc.id"
-                :to="`/incidents/${inc.id}`"
-                class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
-              >
-                <SharedSeverityBadge :severity="inc.severity" />
-                <span class="flex-1 text-[13px] font-medium text-neutral-900 dark:text-neutral-800">INC-{{ inc.number }} {{ inc.title }}</span>
-                <IncidentsIncidentStatusBadge :status="inc.status" />
-                <span class="text-[12px] text-neutral-400">{{ formatRelativeTime(inc.createdAt) }}</span>
-              </NuxtLink>
+              <IncidentsIncidentRow v-for="inc in serviceIncidents" :key="inc.id" :incident="inc" show-time />
             </div>
           </div>
         </div>

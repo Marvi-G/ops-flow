@@ -143,7 +143,7 @@ async function submitComment() {
 
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-800">
+            <h1 class="break-words text-lg font-semibold text-neutral-900 dark:text-neutral-800">
               INC-{{ incident.number }} {{ incident.title }}
             </h1>
             <p class="mt-1 text-[13px] text-neutral-500">{{ incident.description }}</p>
@@ -191,10 +191,10 @@ async function submitComment() {
         <!-- Main content -->
         <div class="lg:col-span-2">
           <!-- Tabs -->
-          <div class="mb-4 flex gap-1 border-b border-neutral-200 dark:border-neutral-300">
+          <div class="mb-4 flex gap-1 overflow-x-auto border-b border-neutral-200 dark:border-neutral-300">
             <button
               :class="[
-                'border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
+                'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
                 activeTab === 'timeline'
                   ? 'border-primary-500 text-primary-600 dark:border-primary-400 dark:text-primary-400'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-600'
@@ -205,7 +205,7 @@ async function submitComment() {
             </button>
             <button
               :class="[
-                'border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
+                'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
                 activeTab === 'comments'
                   ? 'border-primary-500 text-primary-600 dark:border-primary-400 dark:text-primary-400'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-600'
@@ -216,7 +216,7 @@ async function submitComment() {
             </button>
             <button
               :class="[
-                'border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
+                'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
                 activeTab === 'activity'
                   ? 'border-primary-500 text-primary-600 dark:border-primary-400 dark:text-primary-400'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-600'
@@ -299,18 +299,7 @@ async function submitComment() {
             <h3 class="mb-3 text-[14px] font-semibold text-neutral-900 dark:text-neutral-800">Related incidents</h3>
             <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
               <div class="divide-y divide-neutral-200 dark:divide-neutral-300">
-                <NuxtLink
-                  v-for="related in relatedIncidents"
-                  :key="related.id"
-                  :to="`/incidents/${related.id}`"
-                  class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-200/50"
-                >
-                  <SharedSeverityBadge :severity="related.severity" />
-                  <span class="flex-1 truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-800">
-                    INC-{{ related.number }} {{ related.title }}
-                  </span>
-                  <IncidentsIncidentStatusBadge :status="related.status" />
-                </NuxtLink>
+                <IncidentsIncidentRow v-for="related in relatedIncidents" :key="related.id" :incident="related" />
               </div>
             </div>
           </div>

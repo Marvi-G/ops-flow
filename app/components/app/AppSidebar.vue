@@ -29,7 +29,8 @@ function isActive(path: string): boolean {
   <aside
     :class="[
       'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-neutral-200 bg-white transition-all duration-200 dark:border-neutral-300 dark:bg-neutral-100',
-      appStore.sidebarCollapsed ? 'w-16' : 'w-60',
+      'w-60',
+      appStore.sidebarCollapsed ? 'lg:w-16' : '',
       appStore.sidebarMobileOpen ? 'translate-x-0' : '-translate-x-full',
       'lg:translate-x-0 lg:static lg:z-auto'
     ]"
@@ -54,10 +55,10 @@ function isActive(path: string): boolean {
             @click="appStore.closeMobileSidebar()"
           >
             <UIcon :name="item.icon" class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.sidebarCollapsed" class="truncate">{{ item.label }}</span>
+            <span :class="['truncate', appStore.sidebarCollapsed ? 'lg:hidden' : '']">{{ item.label }}</span>
             <span
-              v-else
-              class="invisible absolute left-full ml-2 rounded bg-neutral-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 dark:bg-neutral-700"
+              v-if="appStore.sidebarCollapsed"
+              class="invisible absolute left-full ml-2 hidden lg:block rounded bg-neutral-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 dark:bg-neutral-700"
               role="tooltip"
             >
               {{ item.label }}
@@ -82,10 +83,10 @@ function isActive(path: string): boolean {
             @click="appStore.closeMobileSidebar()"
           >
             <UIcon :name="item.icon" class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.sidebarCollapsed" class="truncate">{{ item.label }}</span>
+            <span :class="['truncate', appStore.sidebarCollapsed ? 'lg:hidden' : '']">{{ item.label }}</span>
             <span
-              v-else
-              class="invisible absolute left-full ml-2 rounded bg-neutral-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 dark:bg-neutral-700"
+              v-if="appStore.sidebarCollapsed"
+              class="invisible absolute left-full ml-2 hidden lg:block rounded bg-neutral-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 dark:bg-neutral-700"
               role="tooltip"
             >
               {{ item.label }}
