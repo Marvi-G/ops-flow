@@ -39,4 +39,12 @@ router.patch(
   projectController.update
 );
 
+// Delete project (refused while it still has services)
+router.delete(
+  '/:id',
+  authorize(PERMISSIONS.PROJECTS_DELETE),
+  validateParams(z.object({ id: z.string().uuid() })),
+  projectController.delete
+);
+
 export default router;

@@ -143,12 +143,31 @@ export class ProjectRepository {
     });
   }
 
-  async update(id: string, input: UpdateProjectInput) {
+  async update(organizationId: string, id: string, input: UpdateProjectInput) {
     const db = getDatabase();
     return db.project.update({
-      where: { id },
+      where: { id, organizationId },
       data: input,
     });
+  }
+
+  async delete(organizationId: string, id: string) {
+    const db = getDatabase();
+    await db.project.delete({ where: { id, organizationId } });
+  }
+
+  async teamExists(organizationId: string, teamId: string): Promise<boolean> {
+    const db = getDatabase();
+    return (await db.team.count({ where: { id: teamId, organizationId } })) > 0;
+  }
+
+  /** Is another project in this organization already called this? */
+  async nameTaken(organizationId: string, name: string, exceptId?: string): Promise<boolean> {
+    const db = getDatabase();
+    const count = await db.project.count({
+      where: { organizationId, name, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    });
+    return count > 0;
   }
 }
 
