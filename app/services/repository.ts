@@ -3,6 +3,7 @@ import type {
   Project,
   Service,
   Team,
+  TeamMember,
   ActivityEvent,
   Notification,
   TimelineEvent,
@@ -11,6 +12,7 @@ import type {
   Organization,
   IncidentFilters,
   IncidentStatus,
+  ServiceStatus,
   PaginationState,
   DashboardStats
 } from '~/types'
@@ -62,6 +64,21 @@ export interface ProjectInput {
   description?: string
   status?: Project['status']
   teamId?: string | null
+}
+
+/** Body of POST/PATCH /services. */
+export interface ServiceInput {
+  name: string
+  description?: string
+  status?: ServiceStatus
+  projectId?: string | null
+}
+
+/** Body of POST/PATCH /teams. */
+export interface TeamInput {
+  name: string
+  description?: string
+  onCallStatus?: Team['onCallStatus']
 }
 
 function delay(ms = 200): Promise<void> {
@@ -168,6 +185,20 @@ export const serviceRepository = {
   async getById(id: string): Promise<Service | undefined> {
     const service = await orUndefined(api.get<ApiService>(`/services/${id}`))
     return service ? mapService(service) : undefined
+  },
+
+  async create(input: ServiceInput): Promise<Service> {
+    return mapService(await api.post<ApiService>('/services', { ...input }))
+  },
+
+  /** Partial update. A null projectId takes the service out of its project. */
+  async update(id: string, patch: Partial<ServiceInput>): Promise<Service> {
+    return mapService(await api.patch<ApiService>(`/services/${id}`, { ...patch }))
+  },
+
+  /** Refused (409) while any incident is linked to the service. */
+  async delete(id: string): Promise<void> {
+    await api.delete(`/services/${id}`)
   }
 }
 
@@ -179,6 +210,32 @@ export const teamRepository = {
   async getById(id: string): Promise<Team | undefined> {
     const team = await orUndefined(api.get<ApiTeam>(`/teams/${id}`))
     return team ? mapTeam(team) : undefined
+  },
+
+  async create(input: TeamInput): Promise<Team> {
+    return mapTeam(await api.post<ApiTeam>('/teams', { ...input }))
+  },
+
+  async update(id: string, patch: Partial<TeamInput>): Promise<Team> {
+    return mapTeam(await api.patch<ApiTeam>(`/teams/${id}`, { ...patch }))
+  },
+
+  /** Refused (409) while the team owns projects or has been on incidents. */
+  async delete(id: string): Promise<void> {
+    await api.delete(`/teams/${id}`)
+  },
+
+  /** The member operations all return the updated team. */
+  async addMember(teamId: string, userId: string, role?: TeamMember['role']): Promise<Team> {
+    return mapTeam(await api.post<ApiTeam>(`/teams/${teamId}/members`, { userId, role }))
+  },
+
+  async setMemberRole(teamId: string, userId: string, role: TeamMember['role']): Promise<Team> {
+    return mapTeam(await api.patch<ApiTeam>(`/teams/${teamId}/members/${userId}`, { role }))
+  },
+
+  async removeMember(teamId: string, userId: string): Promise<void> {
+    await api.delete(`/teams/${teamId}/members/${userId}`)
   }
 }
 

@@ -71,17 +71,43 @@ export class ServiceRepository {
         organizationId,
         name: input.name,
         description: input.description,
+        status: input.status,
         projectId: input.projectId,
       },
     });
   }
 
-  async update(id: string, input: UpdateServiceInput) {
+  async update(organizationId: string, id: string, input: UpdateServiceInput) {
     const db = getDatabase();
     return db.service.update({
-      where: { id },
+      where: { id, organizationId },
       data: input,
     });
+  }
+
+  async delete(organizationId: string, id: string) {
+    const db = getDatabase();
+    await db.service.delete({ where: { id, organizationId } });
+  }
+
+  /** Every incident that has ever been linked to this service, open or closed. */
+  async countIncidents(organizationId: string, id: string): Promise<number> {
+    const db = getDatabase();
+    return db.incidentService.count({ where: { serviceId: id, incident: { organizationId } } });
+  }
+
+  async projectExists(organizationId: string, projectId: string): Promise<boolean> {
+    const db = getDatabase();
+    return (await db.project.count({ where: { id: projectId, organizationId } })) > 0;
+  }
+
+  /** Is another service in this organization already called this? */
+  async nameTaken(organizationId: string, name: string, exceptId?: string): Promise<boolean> {
+    const db = getDatabase();
+    const count = await db.service.count({
+      where: { organizationId, name, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    });
+    return count > 0;
   }
 }
 

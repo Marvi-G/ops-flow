@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useServices } from '~/composables/useServices'
-import { incidentRepository } from '~/services/repository'
+import { incidentRepository, serviceRepository } from '~/services/repository'
 import { formatDateTime } from '~/utils'
 import type { Incident, Service } from '~/types'
 
@@ -13,6 +13,32 @@ const service = ref<Service | null>(null)
 const serviceIncidents = ref<Incident[]>([])
 const loaded = ref(false)
 const loadError = ref('')
+const { can } = usePermissions()
+
+const showEdit = ref(false)
+const showDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
+
+function onSaved(updated: Service) {
+  service.value = updated
+}
+
+async function confirmDelete() {
+  if (deleting.value) return
+  deleting.value = true
+  deleteError.value = ''
+  try {
+    await serviceRepository.delete(serviceId)
+    showDelete.value = false
+    await navigateTo('/services')
+  } catch (err) {
+    // Typically "linked to incidents": the dialog stays open and explains why
+    deleteError.value = err instanceof Error ? err.message : 'Failed to delete the service'
+  } finally {
+    deleting.value = false
+  }
+}
 
 onMounted(async () => {
   try {
@@ -53,8 +79,22 @@ const uptimeData = Array.from({ length: 30 }, (_, i) => ({
       <SharedPageHeader :title="service.name" :description="service.description">
         <template #actions>
           <SharedServiceStatusBadge :status="service.status" />
+          <UButton v-if="can('services.manage')" color="neutral" size="sm" icon="i-lucide-pencil" label="Edit" variant="outline" @click="showEdit = true" />
+          <UButton v-if="can('services.manage')" color="error" size="sm" icon="i-lucide-trash-2" label="Delete" variant="ghost" @click="deleteError = ''; showDelete = true" />
         </template>
       </SharedPageHeader>
+
+      <ServicesFormModal v-model:open="showEdit" :service="service" @saved="onSaved" />
+      <SharedConfirmDialog
+        v-model:open="showDelete"
+        title="Delete this service?"
+        :description="`${service.name} will be removed permanently. This can't be undone.`"
+        confirm-label="Delete service"
+        danger
+        :loading="deleting"
+        :error="deleteError"
+        @confirm="confirmDelete"
+      />
 
       <div class="grid gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 space-y-6">

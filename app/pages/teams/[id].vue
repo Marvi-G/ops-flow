@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTeams } from '~/composables/useTeams'
-import { incidentRepository, projectRepository } from '~/services/repository'
-import type { Incident, Project, Team } from '~/types'
+import { incidentRepository, projectRepository, teamRepository, userRepository } from '~/services/repository'
+import type { Incident, Project, Team, TeamMember, User } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
@@ -15,6 +15,119 @@ const teamIncidentTotal = ref(0)
 const loaded = ref(false)
 const loadError = ref('')
 const activeTab = ref('members')
+const { can } = usePermissions()
+
+const showEdit = ref(false)
+const showDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
+
+function onSaved(updated: Team) {
+  team.value = updated
+}
+
+async function confirmDelete() {
+  if (deleting.value) return
+  deleting.value = true
+  deleteError.value = ''
+  try {
+    await teamRepository.delete(teamId)
+    showDelete.value = false
+    await navigateTo('/teams')
+  } catch (err) {
+    // Typically "still owns projects": the dialog stays open and explains why
+    deleteError.value = err instanceof Error ? err.message : 'Failed to delete the team'
+  } finally {
+    deleting.value = false
+  }
+}
+
+// Members
+const orgUsers = ref<User[]>([])
+const showAddMember = ref(false)
+const addUserId = ref('')
+const memberBusy = ref(false)
+const memberError = ref('')
+const memberToRemove = ref<TeamMember | null>(null)
+const showRemove = ref(false)
+
+const availableUsers = computed(() => {
+  const inTeam = new Set(team.value?.members.map(m => m.userId))
+  return orgUsers.value.filter(u => !inTeam.has(u.id))
+})
+
+async function openAddMember() {
+  showAddMember.value = true
+  memberError.value = ''
+  if (!orgUsers.value.length) {
+    try {
+      orgUsers.value = await userRepository.list()
+    } catch (err) {
+      memberError.value = err instanceof Error ? err.message : 'Could not load the organization members'
+    }
+  }
+}
+
+/** Runs one member change, then shows the team the server returns. */
+async function changeMembers(action: () => Promise<Team | undefined>) {
+  if (memberBusy.value) return
+  memberBusy.value = true
+  memberError.value = ''
+  try {
+    const updated = await action()
+    team.value = updated ?? (await teamRepository.getById(teamId)) ?? team.value
+  } catch (err) {
+    memberError.value = err instanceof Error ? err.message : 'Failed to update the team'
+  } finally {
+    memberBusy.value = false
+  }
+}
+
+async function addMember() {
+  if (!addUserId.value) return
+  await changeMembers(() => teamRepository.addMember(teamId, addUserId.value))
+  if (!memberError.value) {
+    addUserId.value = ''
+    showAddMember.value = false
+  }
+}
+
+function toggleLead(member: TeamMember) {
+  return changeMembers(() => teamRepository.setMemberRole(teamId, member.userId, member.role === 'lead' ? 'member' : 'lead'))
+}
+
+function askRemove(member: TeamMember) {
+  memberToRemove.value = member
+  memberError.value = ''
+  showRemove.value = true
+}
+
+async function confirmRemove() {
+  const member = memberToRemove.value
+  if (!member) return
+  // Removing returns nothing, so the team is read again afterwards
+  await changeMembers(async () => {
+    await teamRepository.removeMember(teamId, member.userId)
+    return undefined
+  })
+  if (!memberError.value) showRemove.value = false
+}
+
+function memberMenu(member: TeamMember) {
+  return [
+    [{
+      label: member.role === 'lead' ? 'Make regular member' : 'Make team lead',
+      icon: 'i-lucide-star',
+      onSelect: () => toggleLead(member)
+    }],
+    [{
+      label: 'Remove from team',
+      icon: 'i-lucide-user-minus',
+      color: 'error' as const,
+      onSelect: () => askRemove(member)
+    }]
+  ]
+}
 
 onMounted(async () => {
   try {
@@ -53,7 +166,34 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
     </div>
 
     <div v-else>
-      <SharedPageHeader :title="team.name" :description="team.description" />
+      <SharedPageHeader :title="team.name" :description="team.description">
+        <template #actions>
+          <UButton v-if="can('members.manage')" color="neutral" size="sm" icon="i-lucide-pencil" label="Edit" variant="outline" @click="showEdit = true" />
+          <UButton v-if="can('members.manage')" color="error" size="sm" icon="i-lucide-trash-2" label="Delete" variant="ghost" @click="deleteError = ''; showDelete = true" />
+        </template>
+      </SharedPageHeader>
+
+      <TeamsFormModal v-model:open="showEdit" :team="team" @saved="onSaved" />
+      <SharedConfirmDialog
+        v-model:open="showDelete"
+        title="Delete this team?"
+        :description="`${team.name} will be removed permanently. This can't be undone.`"
+        confirm-label="Delete team"
+        danger
+        :loading="deleting"
+        :error="deleteError"
+        @confirm="confirmDelete"
+      />
+      <SharedConfirmDialog
+        v-model:open="showRemove"
+        title="Remove from team?"
+        :description="`${memberToRemove?.user.name ?? 'This person'} will no longer be a member of ${team.name}.`"
+        confirm-label="Remove"
+        danger
+        :loading="memberBusy"
+        :error="memberError"
+        @confirm="confirmRemove"
+      />
 
       <!-- Tabs -->
       <div class="mb-6 flex gap-1 overflow-x-auto border-b border-neutral-200 dark:border-neutral-300">
@@ -76,7 +216,30 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
       </div>
 
       <!-- Members tab -->
-      <div v-if="activeTab === 'members'" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+      <div v-if="activeTab === 'members'">
+      <div v-if="can('members.manage')" class="mb-4">
+        <UButton v-if="!showAddMember" color="primary" size="sm" icon="i-lucide-user-plus" label="Add member" @click="openAddMember" />
+        <div v-else class="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center dark:border-neutral-300 dark:bg-neutral-100">
+          <select
+            v-model="addUserId"
+            aria-label="Person to add"
+            class="h-9 w-full rounded-md border border-neutral-200 bg-transparent px-3 text-[13px] text-neutral-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 sm:flex-1 dark:border-neutral-300 dark:text-neutral-800"
+          >
+            <option value="">{{ availableUsers.length ? 'Choose a person' : 'Everyone is already on this team' }}</option>
+            <option v-for="user in availableUsers" :key="user.id" :value="user.id">{{ user.name }} ({{ user.email }})</option>
+          </select>
+          <div class="flex gap-2">
+            <UButton color="primary" size="sm" label="Add" :loading="memberBusy" :disabled="!addUserId" @click="addMember" />
+            <UButton color="neutral" variant="ghost" size="sm" label="Cancel" :disabled="memberBusy" @click="showAddMember = false" />
+          </div>
+        </div>
+        <p v-if="memberError && !showRemove" class="mt-2 text-[12px] text-danger-500">{{ memberError }}</p>
+      </div>
+
+      <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-300 dark:bg-neutral-100">
+        <div v-if="team.members.length === 0" class="p-8 text-center text-[13px] text-neutral-400">
+          This team has no members yet
+        </div>
         <div class="divide-y divide-neutral-200 dark:divide-neutral-300">
           <div
             v-for="member in team.members"
@@ -103,9 +266,19 @@ const tabs = ['members', 'projects', 'incidents', 'activity']
               >
                 {{ member.role === 'lead' ? 'Team Lead' : 'Member' }}
               </span>
+              <UDropdownMenu v-if="can('members.manage')" :items="memberMenu(member)" :content="{ align: 'end' }">
+                <button
+                  class="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-50 dark:hover:bg-neutral-200"
+                  :aria-label="`Actions for ${member.user.name}`"
+                  :disabled="memberBusy"
+                >
+                  <UIcon name="i-lucide-more-horizontal" class="h-4 w-4" />
+                </button>
+              </UDropdownMenu>
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <!-- Projects tab -->

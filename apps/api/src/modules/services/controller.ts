@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { serviceService } from './service.js';
-import { sendSuccess, sendCreated } from '../../infrastructure/response.js';
+import { sendSuccess, sendCreated, sendNoContent } from '../../infrastructure/response.js';
 
 export class ServiceController {
   async findAll(req: Request, res: Response, next: NextFunction) {
@@ -56,6 +56,18 @@ export class ServiceController {
         req.body
       );
       sendSuccess(res, service);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.sessionUser) {
+        throw new Error('Not authenticated');
+      }
+      await serviceService.delete(req.sessionUser.organizationId, req.params.id as string);
+      sendNoContent(res);
     } catch (error) {
       next(error);
     }

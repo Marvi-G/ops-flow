@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { useTeams } from '~/composables/useTeams'
+import type { Team } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const { teams, loading, error, fetch: fetchTeams } = useTeams()
 const search = ref('')
+const { can } = usePermissions()
+const showForm = ref(false)
+
+function onCreated(team: Team) {
+  navigateTo(`/teams/${team.id}`)
+}
 
 const filteredTeams = computed(() => {
   if (!search.value) return teams.value
@@ -19,9 +26,11 @@ onMounted(() => fetchTeams())
   <div>
     <SharedPageHeader title="Teams" description="Manage your organization's teams">
       <template #actions>
-        <UButton color="primary" size="sm" icon="i-lucide-plus" label="Create team" />
+        <UButton v-if="can('members.manage')" color="primary" size="sm" icon="i-lucide-plus" label="Create team" @click="showForm = true" />
       </template>
     </SharedPageHeader>
+
+    <TeamsFormModal v-model:open="showForm" @saved="onCreated" />
 
     <!-- Search -->
     <div class="mb-4">

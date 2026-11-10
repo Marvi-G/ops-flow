@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { useServices } from '~/composables/useServices'
 import { formatRelativeTime } from '~/utils'
+import type { Service } from '~/types'
 
 definePageMeta({ layout: 'default' })
 
 const { services, loading, error, fetch: fetchServices } = useServices()
 const search = ref('')
+const { can } = usePermissions()
+const showForm = ref(false)
+
+function onCreated(service: Service) {
+  navigateTo(`/services/${service.id}`)
+}
 
 const filteredServices = computed(() => {
   if (!search.value) return services.value
@@ -23,9 +30,11 @@ onMounted(() => fetchServices())
   <div>
     <SharedPageHeader title="Services" description="Monitor service health and performance">
       <template #actions>
-        <UButton color="primary" size="sm" icon="i-lucide-plus" label="Add service" />
+        <UButton v-if="can('services.manage')" color="primary" size="sm" icon="i-lucide-plus" label="Add service" @click="showForm = true" />
       </template>
     </SharedPageHeader>
+
+    <ServicesFormModal v-model:open="showForm" @saved="onCreated" />
 
     <!-- Search -->
     <div class="mb-4">

@@ -3,7 +3,7 @@ import { teamController } from './controller.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { authorize, PERMISSIONS } from '../../middleware/authorize.js';
 import { validateBody, validateParams } from '../../middleware/validation.js';
-import { createTeamSchema, updateTeamSchema, addTeamMemberSchema } from './schemas.js';
+import { createTeamSchema, updateTeamSchema, addTeamMemberSchema, updateTeamMemberSchema } from './schemas.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -54,6 +54,15 @@ router.post(
   validateParams(z.object({ id: z.string().uuid() })),
   validateBody(addTeamMemberSchema),
   teamController.addMember
+);
+
+// Change a member's role in the team (lead / member)
+router.patch(
+  '/:id/members/:userId',
+  authorize(PERMISSIONS.MEMBERS_MANAGE),
+  validateParams(z.object({ id: z.string().uuid(), userId: z.string().uuid() })),
+  validateBody(updateTeamMemberSchema),
+  teamController.updateMemberRole
 );
 
 // Remove member from team

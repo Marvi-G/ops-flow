@@ -81,12 +81,29 @@ export class TeamController {
       if (!req.sessionUser) {
         throw new Error('Not authenticated');
       }
-      await teamService.addMember(
+      const team = await teamService.addMember(
         req.sessionUser.organizationId,
         req.params.id as string,
         req.body
       );
-      sendSuccess(res, { success: true });
+      sendCreated(res, team);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMemberRole(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.sessionUser) {
+        throw new Error('Not authenticated');
+      }
+      const team = await teamService.updateMemberRole(
+        req.sessionUser.organizationId,
+        req.params.id as string,
+        req.params.userId as string,
+        req.body
+      );
+      sendSuccess(res, team);
     } catch (error) {
       next(error);
     }

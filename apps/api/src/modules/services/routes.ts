@@ -39,4 +39,12 @@ router.patch(
   serviceController.update
 );
 
+// Delete service (refused while incidents reference it)
+router.delete(
+  '/:id',
+  authorize(PERMISSIONS.SERVICES_MANAGE),
+  validateParams(z.object({ id: z.string().uuid() })),
+  serviceController.delete
+);
+
 export default router;
