@@ -68,6 +68,44 @@ export class OrganizationRepository {
     });
   }
 
+  async findBySlug(slug: string) {
+    const db = getDatabase();
+    return db.organization.findUnique({ where: { slug } });
+  }
+
+  /** One member in the same shape as the members list. */
+  async getMember(organizationId: string, userId: string) {
+    const db = getDatabase();
+    const member = await db.organizationMember.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+      include: { user: { select: { id: true, email: true, name: true, avatar: true } } },
+    });
+    return member ? { ...member.user, role: member.role, joinedAt: member.createdAt } : null;
+  }
+
+  async updateMemberRole(organizationId: string, userId: string, role: string) {
+    const db = getDatabase();
+    await db.organizationMember.update({
+      where: { organizationId_userId: { organizationId, userId } },
+      data: { role },
+    });
+  }
+
+  /**
+   * Removes the person from this organization and tidies up everything that pointed at
+   * them here: team memberships, incidents assigned to them, and their sessions in it.
+   * Incidents they created stay (the history is not theirs to take away).
+   */
+  async removeMember(organizationId: string, userId: string) {
+    const db = getDatabase();
+    await db.$transaction([
+      db.teamMember.deleteMany({ where: { userId, team: { organizationId } } }),
+      db.incident.updateMany({ where: { organizationId, assigneeId: userId }, data: { assigneeId: null } }),
+      db.session.deleteMany({ where: { userId, organizationId } }),
+      db.organizationMember.delete({ where: { organizationId_userId: { organizationId, userId } } }),
+    ]);
+  }
+
   async getMembers(organizationId: string) {
     const db = getDatabase();
     return db.organizationMember.findMany({

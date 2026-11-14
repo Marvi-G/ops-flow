@@ -261,6 +261,16 @@ export const userRepository = {
   /** Members of the current organization (needs the members.read permission). */
   async list(): Promise<User[]> {
     return (await api.get<ApiOrgUser[]>('/users')).map(u => mapOrgUser(u))
+  },
+
+  /** Changes a member's role in the current organization (members.manage). */
+  async setRole(userId: string, role: User['role']): Promise<User> {
+    return mapOrgUser(await api.patch<ApiOrgUser>(`/organizations/current/members/${userId}`, { role }))
+  },
+
+  /** Removes a member from the current organization (members.manage). */
+  async remove(userId: string): Promise<void> {
+    await api.delete(`/organizations/current/members/${userId}`)
   }
 }
 
@@ -271,6 +281,11 @@ export const organizationRepository = {
 
   async list(): Promise<Organization[]> {
     return (await api.get<ApiOrganization[]>('/organizations')).map(mapOrganization)
+  },
+
+  /** Saves name and/or slug of the current organization (settings.manage). */
+  async update(patch: { name?: string, slug?: string }): Promise<Organization> {
+    return mapOrganization(await api.patch<ApiOrganization>('/organizations/current', { ...patch }))
   }
 }
 

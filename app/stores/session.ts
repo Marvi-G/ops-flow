@@ -85,6 +85,12 @@ export const useSessionStore = defineStore('session', () => {
     await fetchMe()
   }
 
+  /** Replaces the current organization after it was edited, in the switcher list too. */
+  function setOrganization(updated: Organization) {
+    organization.value = updated
+    allOrganizations.value = allOrganizations.value.map(o => o.id === updated.id ? updated : o)
+  }
+
   function markAllRead() {
     notificationsList.value.forEach(n => { n.read = true })
   }
@@ -102,6 +108,7 @@ export const useSessionStore = defineStore('session', () => {
     login,
     logout,
     switchOrganization,
+    setOrganization,
     markAllRead
   }
 })

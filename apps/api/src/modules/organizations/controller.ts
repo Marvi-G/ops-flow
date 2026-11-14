@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { organizationService } from './service.js';
-import { sendSuccess } from '../../infrastructure/response.js';
+import { sendSuccess, sendNoContent } from '../../infrastructure/response.js';
 
 export class OrganizationController {
   async getCurrent(req: Request, res: Response, next: NextFunction) {
@@ -51,6 +51,39 @@ export class OrganizationController {
         req.sessionUser.organizationId
       );
       sendSuccess(res, members);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMember(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.sessionUser) {
+        throw new Error('Not authenticated');
+      }
+      const member = await organizationService.updateMemberRole(
+        req.sessionUser.organizationId,
+        { userId: req.sessionUser.user.id, role: req.sessionUser.role },
+        req.params.userId as string,
+        req.body
+      );
+      sendSuccess(res, member);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async removeMember(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.sessionUser) {
+        throw new Error('Not authenticated');
+      }
+      await organizationService.removeMember(
+        req.sessionUser.organizationId,
+        { userId: req.sessionUser.user.id, role: req.sessionUser.role },
+        req.params.userId as string
+      );
+      sendNoContent(res);
     } catch (error) {
       next(error);
     }
