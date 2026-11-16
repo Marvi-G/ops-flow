@@ -5,7 +5,7 @@ import { getInitials } from '~/utils'
 const sessionStore = useSessionStore()
 const router = useRouter()
 
-const items = [
+const items = computed(() => [
   [
     {
       label: sessionStore.user.name,
@@ -14,7 +14,7 @@ const items = [
     }
   ],
   [
-    { label: 'Profile', icon: 'i-lucide-user', onSelect: () => {} },
+    { label: 'Profile', icon: 'i-lucide-user', onSelect: () => router.push('/settings/profile') },
     { label: 'Settings', icon: 'i-lucide-settings', onSelect: () => router.push('/settings') }
   ],
   [
@@ -24,7 +24,7 @@ const items = [
       onSelect: () => sessionStore.logout()
     }
   ]
-]
+])
 </script>
 
 <template>

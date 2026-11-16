@@ -332,8 +332,13 @@ The seed script creates:
 - **Incidents**: 4 incidents with comments and events
 
 Default credentials:
-- Email: `admin@northstarlabs.io` (Mark Chen)
+- Email: `admin@northstarlabs.io` (Mark Chen, admin)
 - Password: `admin`
+
+The public login page uses a separate **read-only demo account**, `demo@northstarlabs.io` / `demo`
+(viewer role). The API refuses to change its name or password. The seed creates it. To add it to an
+existing database without wiping data, run `npm run db:add-demo`. On a public deployment, change
+the admin password (Settings → Profile) so only you can sign in as admin.
 
 The other seeded users (`sarah@`, `alex@`, ... `@northstarlabs.io`) use `password123`.
 

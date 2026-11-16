@@ -263,6 +263,15 @@ export const userRepository = {
     return (await api.get<ApiOrgUser[]>('/users')).map(u => mapOrgUser(u))
   },
 
+  async updateName(name: string): Promise<{ name: string }> {
+    return api.patch<{ name: string }>('/users/current', { name })
+  },
+
+  /** Changes the password and signs every other device out. 422 with a field error if the current one is wrong. */
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await api.post('/users/current/password', { currentPassword, newPassword })
+  },
+
   /** Changes a member's role in the current organization (members.manage). */
   async setRole(userId: string, role: User['role']): Promise<User> {
     return mapOrgUser(await api.patch<ApiOrgUser>(`/organizations/current/members/${userId}`, { role }))

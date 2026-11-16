@@ -24,6 +24,7 @@ const crumbs = computed<Crumb[]>(() => {
     settings: 'Settings',
     new: 'New',
     organization: 'Organization',
+    profile: 'Profile',
     members: 'Members',
     roles: 'Roles & Permissions',
     notifications: 'Notifications',

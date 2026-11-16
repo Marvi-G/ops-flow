@@ -228,7 +228,7 @@ function getGreeting(): string {
               class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-neutral-200/50"
             >
               <UIcon name="i-lucide-user-plus" class="h-4 w-4 text-neutral-400" />
-              Invite member
+              Manage members
             </NuxtLink>
           </div>
         </div>

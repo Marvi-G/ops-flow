@@ -91,7 +91,6 @@ const roleBadge = (role: User['role']) =>
     <div>
       <div class="mb-4 flex items-center justify-between">
         <p class="text-[13px] text-neutral-500">{{ loading ? 'Loading members...' : `${users.length} members` }}</p>
-        <UButton color="primary" size="sm" icon="i-lucide-user-plus" label="Invite member" />
       </div>
 
       <p v-if="actionError" class="mb-4 rounded-md bg-danger-50 p-3 text-[13px] text-danger-500 dark:bg-danger-50/20">

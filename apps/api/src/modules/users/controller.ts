@@ -37,7 +37,8 @@ export class UserController {
       }
       await userService.changePassword(
         req.sessionUser.user.id,
-        req.body
+        req.body,
+        req.cookies?.session
       );
       sendNoContent(res);
     } catch (error) {

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { DEMO_EMAIL, DEMO_PASSWORD, ensureDemoUser } from './demo-user.js';
 
 const prisma = new PrismaClient();
 
@@ -122,6 +123,10 @@ async function main() {
   });
 
   console.log('✅ Created organization memberships');
+
+  // Read-only account for the public login page
+  await ensureDemoUser(prisma, organization.id);
+  console.log('✅ Created the read-only demo account');
 
   // Create teams
   const teams = await Promise.all([
@@ -550,8 +555,8 @@ async function main() {
 
   console.log('\n🎉 Seed completed successfully!');
   console.log('\n📋 Test credentials:');
-  console.log('   Email: admin@northstarlabs.io');
-  console.log('   Password: admin');
+  console.log('   Admin:  admin@northstarlabs.io / admin');
+  console.log(`   Demo (read-only):  ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
 }
 
 main()

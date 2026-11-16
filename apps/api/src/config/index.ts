@@ -8,6 +8,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(15 * 60 * 1000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
+  // The shared read-only demo account: its name and password can't be changed (see prisma/demo-user.ts)
+  DEMO_USER_EMAIL: z.string().default('demo@northstarlabs.io'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 });
 

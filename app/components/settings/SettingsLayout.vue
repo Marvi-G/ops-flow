@@ -2,6 +2,7 @@
 const route = useRoute()
 
 const settingsNav = [
+  { label: 'Profile', to: '/settings/profile' },
   { label: 'General', to: '/settings' },
   { label: 'Organization', to: '/settings/organization' },
   { label: 'Members', to: '/settings/members' },

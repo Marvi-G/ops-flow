@@ -85,6 +85,10 @@ export const useSessionStore = defineStore('session', () => {
     await fetchMe()
   }
 
+  function setUserName(name: string) {
+    user.value = { ...user.value, name }
+  }
+
   /** Replaces the current organization after it was edited, in the switcher list too. */
   function setOrganization(updated: Organization) {
     organization.value = updated
@@ -109,6 +113,7 @@ export const useSessionStore = defineStore('session', () => {
     logout,
     switchOrganization,
     setOrganization,
+    setUserName,
     markAllRead
   }
 })
